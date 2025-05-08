@@ -1,25 +1,46 @@
 import { useState } from "react";
-import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
+import { useLocation } from "wouter";
+import { apiRequest } from "@/lib/queryClient";
 
 interface LoginFormProps {
   toggleForm: () => void;
 }
 
 export default function LoginForm({ toggleForm }: LoginFormProps) {
-  const { login, isLoading, error } = useAuth();
+  // Temporary direct implementation without AuthContext
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
+  const [, setLocation] = useLocation();
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await login(username, password);
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const response = await apiRequest("POST", "/api/auth/login", { username, password });
+      const userData = await response.json();
+      
+      // Store user data
+      localStorage.setItem("futureUser", JSON.stringify(userData));
+      
+      // Redirect to dashboard
+      setLocation("/dashboard");
+    } catch (err) {
+      console.error("Login error:", err);
+      setError("Invalid username or password");
+    } finally {
+      setIsLoading(false);
+    }
   };
   
   return (

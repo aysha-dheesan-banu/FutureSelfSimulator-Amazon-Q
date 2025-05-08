@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +8,8 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { useLocation } from "wouter";
+import { apiRequest } from "@/lib/queryClient";
 
 interface SignupFormProps {
   toggleForm: () => void;
@@ -28,7 +29,10 @@ const signupSchema = z.object({
 type SignupFormValues = z.infer<typeof signupSchema>;
 
 export default function SignupForm({ toggleForm }: SignupFormProps) {
-  const { register, isLoading, error } = useAuth();
+  // Directly handling auth state
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [, setLocation] = useLocation();
   
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
@@ -42,11 +46,30 @@ export default function SignupForm({ toggleForm }: SignupFormProps) {
   });
   
   const onSubmit = async (data: SignupFormValues) => {
-    const { confirmPassword, ...userData } = data;
-    await register({
-      ...userData,
-      avatarUrl: "https://images.unsplash.com/photo-1633332755192-727a05c4013d?ixlib=rb-4.0.3&auto=format&fit=crop&w=120&h=120"
-    });
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const { confirmPassword, ...userData } = data;
+      
+      const response = await apiRequest("POST", "/api/auth/register", {
+        ...userData,
+        avatarUrl: "https://images.unsplash.com/photo-1633332755192-727a05c4013d?ixlib=rb-4.0.3&auto=format&fit=crop&w=120&h=120"
+      });
+      
+      const newUser = await response.json();
+      
+      // Store user data
+      localStorage.setItem("futureUser", JSON.stringify(newUser));
+      
+      // Redirect to dashboard
+      setLocation("/dashboard");
+    } catch (err) {
+      console.error("Registration error:", err);
+      setError("Registration failed. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
   
   return (
