@@ -1,11 +1,10 @@
 import { useState } from "react";
-import { useAuth } from "@/hooks/use-auth";
 import LoginForm from "@/components/auth/login-form";
 import SignupForm from "@/components/auth/signup-form";
 
+// Removed useAuth import and usage to prevent circular dependency
 export default function Login() {
   const [isLogin, setIsLogin] = useState(true);
-  const { isLoading } = useAuth();
   
   const toggleForm = () => {
     setIsLogin(!isLogin);
