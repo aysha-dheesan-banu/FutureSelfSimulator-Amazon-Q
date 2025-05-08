@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest } from "@/lib/queryClient";
@@ -54,6 +54,13 @@ export default function Goals() {
       completed: false
     }
   });
+  
+  // Update the form's userId when the user changes
+  useEffect(() => {
+    if (user) {
+      goalForm.setValue('userId', user.id);
+    }
+  }, [user, goalForm]);
   
   // Create goal mutation
   const createGoalMutation = useMutation({

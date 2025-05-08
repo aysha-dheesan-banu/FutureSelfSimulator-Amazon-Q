@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useTimeline } from "@/hooks/use-timeline";
@@ -18,7 +18,20 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import TimelineController from "@/components/dashboard/timeline-controller";
 
 export default function FutureSelf() {
-  const { user } = useAuth();
+  // Get user from localStorage as a fallback if context is not available
+  const [user, setUser] = useState<any>(null);
+  
+  useEffect(() => {
+    try {
+      const storedUser = localStorage.getItem("futureUser");
+      if (storedUser) {
+        setUser(JSON.parse(storedUser));
+      }
+    } catch (e) {
+      console.error("Error parsing stored user", e);
+    }
+  }, []);
+  
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("profile");
@@ -70,7 +83,7 @@ export default function FutureSelf() {
   });
   
   // Initialize form data when profile loads
-  useState(() => {
+  useEffect(() => {
     if (baseProfile) {
       setFormData({
         career: baseProfile.career || "",
@@ -83,7 +96,7 @@ export default function FutureSelf() {
         avatarUrl: baseProfile.avatarUrl || user?.avatarUrl || ""
       });
     }
-  });
+  }, [baseProfile, user]);
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
