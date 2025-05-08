@@ -352,7 +352,11 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// Import and use DynamoDB storage
+import { DynamoDBStorage } from "./db/dynamodb-storage";
+
+// Use DynamoDB storage instead of MemStorage
+export const storage = new DynamoDBStorage();
 
 // Add some seed data
 async function seedData() {

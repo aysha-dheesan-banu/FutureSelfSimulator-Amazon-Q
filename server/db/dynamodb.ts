@@ -13,6 +13,8 @@ const client = new DynamoDBClient({
     accessKeyId: process.env.AWS_ACCESS_KEY_ID || "",
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "",
   },
+  // For demo purposes - avoid throttling on free tier
+  maxAttempts: 5
 });
 
 // Create a document client (makes it easier to work with DynamoDB items)

@@ -89,7 +89,7 @@ export async function updateItem(
     UpdateExpression: updateExpression,
     ExpressionAttributeNames: expressionAttributeNames,
     ExpressionAttributeValues: expressionAttributeValues,
-    ReturnValues: "ALL_NEW",
+    ReturnValues: "ALL_NEW" as const,
   };
 
   const response = await ddbDocClient.send(new UpdateCommand(params));
