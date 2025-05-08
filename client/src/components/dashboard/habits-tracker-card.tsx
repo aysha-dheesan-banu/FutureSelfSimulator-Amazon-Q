@@ -10,7 +10,17 @@ import { useAuth } from "@/hooks/use-auth";
 import { apiRequest } from "@/lib/queryClient";
 
 export default function HabitsTrackerCard() {
-  const { user } = useAuth();
+  // Get user from localStorage as a fallback if context is not available
+  let user;
+  try {
+    const storedUser = localStorage.getItem("futureUser");
+    if (storedUser) {
+      user = JSON.parse(storedUser);
+    }
+  } catch (e) {
+    console.error("Error parsing stored user", e);
+  }
+  
   const queryClient = useQueryClient();
   
   const { data: habits, isLoading } = useQuery<Habit[]>({
