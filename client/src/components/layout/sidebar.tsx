@@ -1,5 +1,5 @@
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
 import { 
   BarChart3, 
@@ -10,10 +10,24 @@ import {
   Settings 
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { User } from "@shared/schema";
 
 export default function Sidebar() {
   const [location] = useLocation();
-  const { user } = useAuth();
+  
+  // Get user from localStorage
+  const [user, setUser] = useState<User | null>(null);
+  
+  useEffect(() => {
+    const storedUser = localStorage.getItem("futureUser");
+    if (storedUser) {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (e) {
+        console.error("Error parsing stored user", e);
+      }
+    }
+  }, []);
   
   // User level and points
   const level = user?.level || 1;

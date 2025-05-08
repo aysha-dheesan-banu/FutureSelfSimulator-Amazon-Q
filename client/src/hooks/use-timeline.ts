@@ -1,10 +1,20 @@
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { FutureProfile } from "@shared/schema";
-import { useAuth } from "./use-auth";
+import { FutureProfile, User } from "@shared/schema";
 
 export function useTimeline() {
-  const { user } = useAuth();
+  const [user, setUser] = useState<User | null>(null);
+  useEffect(() => {
+    const storedUser = localStorage.getItem("futureUser");
+    if (storedUser) {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (e) {
+        console.error("Error parsing stored user", e);
+      }
+    }
+  }, []);
+  
   const [timelineYear, setTimelineYear] = useState(1);
   const queryClient = useQueryClient();
   

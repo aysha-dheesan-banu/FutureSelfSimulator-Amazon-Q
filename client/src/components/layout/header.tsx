@@ -1,4 +1,4 @@
-import { useAuth } from "@/hooks/use-auth";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -9,9 +9,31 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Bell } from "lucide-react";
+import { User } from "@shared/schema";
+import { useLocation } from "wouter";
 
 export default function Header() {
-  const { user, logout } = useAuth();
+  // Get user from localStorage
+  const [user, setUser] = useState<User | null>(null);
+  const [, setLocation] = useLocation();
+  
+  useEffect(() => {
+    const storedUser = localStorage.getItem("futureUser");
+    if (storedUser) {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (e) {
+        console.error("Error parsing stored user", e);
+      }
+    }
+  }, []);
+  
+  // Logout function
+  const logout = () => {
+    localStorage.removeItem("futureUser");
+    setUser(null);
+    setLocation("/");
+  };
   
   const initials = user?.name
     ? user.name

@@ -1,4 +1,4 @@
-import { useAuth } from "@/hooks/use-auth";
+import { useState, useEffect } from "react";
 import { useTimeline } from "@/hooks/use-timeline";
 import Header from "@/components/layout/header";
 import Sidebar from "@/components/layout/sidebar";
@@ -11,9 +11,22 @@ import FutureImpactCard from "@/components/dashboard/future-impact-card";
 import AICoachCard from "@/components/dashboard/ai-coach-card";
 import JournalCard from "@/components/dashboard/journal-card";
 import MotivationalQuote from "@/components/dashboard/motivational-quote";
+import { User } from "@shared/schema";
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  // Temporary solution to get user from localStorage without context
+  const [user, setUser] = useState<User | null>(null);
+  useEffect(() => {
+    const storedUser = localStorage.getItem("futureUser");
+    if (storedUser) {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (e) {
+        console.error("Error parsing stored user", e);
+      }
+    }
+  }, []);
+  
   const { timelineYear, updateTimelineYear, projectedProfile, isLoading } = useTimeline();
   
   if (!user) {
