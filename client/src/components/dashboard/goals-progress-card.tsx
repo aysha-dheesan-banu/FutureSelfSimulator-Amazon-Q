@@ -9,7 +9,16 @@ import { Goal } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 
 export default function GoalsProgressCard() {
-  const { user } = useAuth();
+  // Get user from localStorage as a fallback if context is not available
+  let user;
+  try {
+    const storedUser = localStorage.getItem("futureUser");
+    if (storedUser) {
+      user = JSON.parse(storedUser);
+    }
+  } catch (e) {
+    console.error("Error parsing stored user", e);
+  }
   
   const { data: goals, isLoading } = useQuery<Goal[]>({
     queryKey: [user ? `/api/users/${user.id}/goals` : null],
