@@ -4,18 +4,23 @@ import { useAuth } from "@/hooks/use-auth";
 import { useTimeline } from "@/hooks/use-timeline";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { saveProfileToStorage, loadProfileFromStorage } from "@/lib/profile-storage";
 import Header from "@/components/layout/header";
 import Sidebar from "@/components/layout/sidebar";
 import MobileNav from "@/components/layout/mobile-nav";
 import AvatarSelector from "@/components/profile/avatar-selector";
 import TraitQuiz from "@/components/profile/trait-quiz";
+import ProfileDisplay from "@/components/profile/profile-display";
+import CurrentStateForm from "@/components/profile/current-state-form";
+import FutureVisionForm from "@/components/profile/future-vision-form";
 import { FutureProfile } from "@shared/schema";
+import { CurrentState, FutureVision, StatusType } from "@shared/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import TimelineController from "@/components/dashboard/timeline-controller";
+import { FutureTimelineController } from "@/components/future-prediction/future-timeline-controller";
 
 export default function FutureSelf() {
   // Get user from localStorage as a fallback if context is not available
@@ -37,7 +42,11 @@ export default function FutureSelf() {
   const [activeTab, setActiveTab] = useState("profile");
   const { timelineYear, updateTimelineYear, baseProfile, projectedProfile, isLoading } = useTimeline();
   
-  const [formData, setFormData] = useState<Partial<FutureProfile>>({
+  // State for the avatar
+  const [avatarUrl, setAvatarUrl] = useState<string>("");
+  
+  // State for future vision
+  const [futureVision, setFutureVision] = useState<FutureVision>({
     career: "",
     education: "",
     health: "",
@@ -45,38 +54,104 @@ export default function FutureSelf() {
     relationships: "",
     location: "",
     personalGrowth: "",
-    avatarUrl: ""
+    skills: [],
+    hobbies: []
   });
+  
+  // State for current state
+  const [currentState, setCurrentState] = useState<CurrentState>({
+    statusType: "professional",
+    education: "",
+    health: "",
+    wealth: "",
+    relationships: "",
+    location: "",
+    skills: [],
+    hobbies: []
+  });
+  
+  // Combined form data for API submission
+  const formData: Partial<FutureProfile> = {
+    avatarUrl,
+    career: futureVision.career,
+    education: futureVision.education,
+    health: futureVision.health,
+    wealth: futureVision.wealth,
+    relationships: futureVision.relationships,
+    location: futureVision.location,
+    personalGrowth: futureVision.personalGrowth,
+    skills: futureVision.skills,
+    hobbies: futureVision.hobbies,
+    currentState
+  };
   
   // Create/update future profile
   const profileMutation = useMutation({
     mutationFn: async (data: Partial<FutureProfile>) => {
-      if (baseProfile) {
-        // Update existing profile
-        const response = await apiRequest("PATCH", `/api/future-profiles/${baseProfile.id}`, data);
-        return response.json();
-      } else {
-        // Create new profile
-        const response = await apiRequest("POST", "/api/future-profiles", {
-          userId: user?.id,
-          ...data
-        });
-        return response.json();
+      try {
+        // Prepare the data - ensure arrays are properly formatted
+        const preparedData = { ...data };
+        
+        // Convert skills and hobbies to arrays if they're strings
+        if (typeof preparedData.skills === 'string') {
+          preparedData.skills = (preparedData.skills as string).split(',').map(s => s.trim());
+        }
+        
+        if (typeof preparedData.hobbies === 'string') {
+          preparedData.hobbies = (preparedData.hobbies as string).split(',').map(s => s.trim());
+        }
+        
+        console.log("Submitting profile data:", preparedData);
+        
+        if (baseProfile) {
+          // Update existing profile
+          const response = await apiRequest("PATCH", `/api/future-profiles/${baseProfile.id}`, preparedData);
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || "Failed to update profile");
+          }
+          return response.json();
+        } else {
+          // Create new profile
+          // Ensure userId is a number within PostgreSQL integer range
+          const userId = typeof user?.id === 'number' ? Math.min(user.id, 2147483647) : 1;
+          console.log("Using userId:", userId);
+          
+          const response = await apiRequest("POST", "/api/future-profiles", {
+            userId: userId,
+            ...preparedData
+          });
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || "Failed to create profile");
+          }
+          return response.json();
+        }
+      } catch (error) {
+        console.error("Profile mutation error:", error);
+        throw error;
       }
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       // Invalidate cache to refetch profile
       queryClient.invalidateQueries({ queryKey: [user ? `/api/future-profiles/${user.id}` : null] });
+      
+      // Store the profile data in localStorage for persistence
+      if (user) {
+        saveProfileToStorage(user.id, data);
+      }
+      
       toast({
         title: "Success",
         description: "Your future self profile has been updated.",
         variant: "default",
       });
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Profile mutation error:", error);
       toast({
         title: "Error",
-        description: "Failed to update your profile. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to update your profile. Please try again.",
         variant: "destructive",
       });
     }
@@ -84,8 +159,13 @@ export default function FutureSelf() {
   
   // Initialize form data when profile loads
   useEffect(() => {
+    // First try to load from API response (baseProfile)
     if (baseProfile) {
-      setFormData({
+      // Set avatar
+      setAvatarUrl(baseProfile.avatarUrl || user?.avatarUrl || "");
+      
+      // Set future vision
+      setFutureVision({
         career: baseProfile.career || "",
         education: baseProfile.education || "",
         health: baseProfile.health || "",
@@ -93,18 +173,48 @@ export default function FutureSelf() {
         relationships: baseProfile.relationships || "",
         location: baseProfile.location || "",
         personalGrowth: baseProfile.personalGrowth || "",
-        avatarUrl: baseProfile.avatarUrl || user?.avatarUrl || ""
+        skills: baseProfile.skills || [],
+        hobbies: baseProfile.hobbies || []
       });
+      
+      // Set current state if available
+      if (baseProfile.currentState) {
+        setCurrentState(baseProfile.currentState as CurrentState);
+      }
+    } 
+    // If no baseProfile from API, try to load from localStorage
+    else if (user) {
+      const storedProfile = loadProfileFromStorage(user.id);
+      
+      if (storedProfile) {
+        console.log("Loaded profile from localStorage:", storedProfile);
+        
+        // Set avatar
+        setAvatarUrl(storedProfile.avatarUrl || user?.avatarUrl || "");
+        
+        // Set future vision
+        setFutureVision({
+          career: storedProfile.career || "",
+          education: storedProfile.education || "",
+          health: storedProfile.health || "",
+          wealth: storedProfile.wealth || "",
+          relationships: storedProfile.relationships || "",
+          location: storedProfile.location || "",
+          personalGrowth: storedProfile.personalGrowth || "",
+          skills: storedProfile.skills || [],
+          hobbies: storedProfile.hobbies || []
+        });
+        
+        // Set current state if available
+        if (storedProfile.currentState) {
+          setCurrentState(storedProfile.currentState as CurrentState);
+        }
+      }
     }
   }, [baseProfile, user]);
   
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-  
   const handleAvatarSelect = (url: string) => {
-    setFormData(prev => ({ ...prev, avatarUrl: url }));
+    setAvatarUrl(url);
   };
   
   const handleTraitUpdate = (traits: Record<string, any>) => {
@@ -114,7 +224,24 @@ export default function FutureSelf() {
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    profileMutation.mutate(formData);
+    
+    // Combine all data for submission
+    const submissionData: Partial<FutureProfile> = {
+      avatarUrl,
+      career: futureVision.career,
+      education: futureVision.education,
+      health: futureVision.health,
+      wealth: futureVision.wealth,
+      relationships: futureVision.relationships,
+      location: futureVision.location,
+      personalGrowth: futureVision.personalGrowth,
+      skills: futureVision.skills,
+      hobbies: futureVision.hobbies,
+      currentState
+    };
+    
+    console.log("Submitting combined profile data:", submissionData);
+    profileMutation.mutate(submissionData);
   };
   
   if (!user) return null;
@@ -133,10 +260,14 @@ export default function FutureSelf() {
                 My Future Self
               </h2>
               
-              <TimelineController 
-                value={timelineYear} 
-                onChange={updateTimelineYear} 
-              />
+              {/* Import from future-prediction folder instead of dashboard */}
+              <div className="w-full sm:w-auto mt-3 sm:mt-0">
+                <FutureTimelineController 
+                  value={timelineYear} 
+                  onChange={updateTimelineYear}
+                  profile={projectedProfile}
+                />
+              </div>
             </div>
             
             <div className="mt-6">
@@ -155,98 +286,54 @@ export default function FutureSelf() {
                         </CardHeader>
                         <CardContent>
                           <AvatarSelector 
-                            selectedAvatar={formData.avatarUrl} 
+                            selectedAvatar={avatarUrl} 
                             onSelect={handleAvatarSelect} 
                           />
                         </CardContent>
                       </Card>
+                      
+                      {/* Add the profile display component */}
+                      <div className="mt-6">
+                        <ProfileDisplay 
+                          profile={{...futureVision, currentState, avatarUrl}} 
+                          timelineYears={timelineYear} 
+                        />
+                      </div>
                     </div>
                     
                     <div className="md:col-span-2">
                       <Card>
                         <CardHeader>
-                          <CardTitle>Future Self Details</CardTitle>
+                          <CardTitle>My Profile</CardTitle>
                         </CardHeader>
                         <CardContent>
-                          <form onSubmit={handleSubmit} className="space-y-4">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                              <div className="space-y-2">
-                                <Label htmlFor="career">Career</Label>
-                                <Input 
-                                  id="career" 
-                                  name="career" 
-                                  placeholder="Senior Developer"
-                                  value={formData.career}
-                                  onChange={handleInputChange}
-                                />
-                              </div>
+                          <form onSubmit={handleSubmit} className="space-y-6">
+                            <Tabs defaultValue="current" className="w-full">
+                              <TabsList className="grid grid-cols-2 w-full">
+                                <TabsTrigger value="current">Current State</TabsTrigger>
+                                <TabsTrigger value="future">Future Vision</TabsTrigger>
+                              </TabsList>
                               
-                              <div className="space-y-2">
-                                <Label htmlFor="education">Education</Label>
-                                <Input 
-                                  id="education" 
-                                  name="education" 
-                                  placeholder="Master's Degree"
-                                  value={formData.education}
-                                  onChange={handleInputChange}
+                              <TabsContent value="current" className="mt-4 space-y-4">
+                                <p className="text-sm text-gray-500 mb-4">
+                                  Tell us about your current situation. This helps us create more meaningful projections for your future self.
+                                </p>
+                                <CurrentStateForm 
+                                  value={currentState} 
+                                  onChange={setCurrentState} 
                                 />
-                              </div>
+                              </TabsContent>
                               
-                              <div className="space-y-2">
-                                <Label htmlFor="health">Health</Label>
-                                <Input 
-                                  id="health" 
-                                  name="health" 
-                                  placeholder="Good health, regular fitness"
-                                  value={formData.health}
-                                  onChange={handleInputChange}
+                              <TabsContent value="future" className="mt-4 space-y-4">
+                                <p className="text-sm text-gray-500 mb-4">
+                                  Describe your ideal future self. What do you aspire to become in the years ahead?
+                                </p>
+                                <FutureVisionForm 
+                                  value={futureVision} 
+                                  onChange={setFutureVision} 
                                 />
-                              </div>
-                              
-                              <div className="space-y-2">
-                                <Label htmlFor="wealth">Wealth</Label>
-                                <Input 
-                                  id="wealth" 
-                                  name="wealth" 
-                                  placeholder="$95,000 annual income"
-                                  value={formData.wealth}
-                                  onChange={handleInputChange}
-                                />
-                              </div>
-                              
-                              <div className="space-y-2">
-                                <Label htmlFor="relationships">Relationships</Label>
-                                <Input 
-                                  id="relationships" 
-                                  name="relationships" 
-                                  placeholder="Married with supportive partner"
-                                  value={formData.relationships}
-                                  onChange={handleInputChange}
-                                />
-                              </div>
-                              
-                              <div className="space-y-2">
-                                <Label htmlFor="location">Location</Label>
-                                <Input 
-                                  id="location" 
-                                  name="location" 
-                                  placeholder="Tech hub city"
-                                  value={formData.location}
-                                  onChange={handleInputChange}
-                                />
-                              </div>
-                              
-                              <div className="space-y-2 sm:col-span-2">
-                                <Label htmlFor="personalGrowth">Personal Growth</Label>
-                                <Input 
-                                  id="personalGrowth" 
-                                  name="personalGrowth" 
-                                  placeholder="Regular learning and development"
-                                  value={formData.personalGrowth}
-                                  onChange={handleInputChange}
-                                />
-                              </div>
-                            </div>
+                              </TabsContent>
+                            </Tabs>
                             
                             <div className="pt-4 flex justify-end">
                               <Button 

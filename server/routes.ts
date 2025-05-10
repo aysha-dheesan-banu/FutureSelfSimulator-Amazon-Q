@@ -28,6 +28,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Invalid credentials" });
       }
       
+      // Set user in session
+      if (req.session) {
+        req.session.userId = user.id;
+      }
+      
       // Remove password from the response
       const { password: _, ...userWithoutPassword } = user;
       
@@ -56,12 +61,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(409).json({ message: "Username already taken" });
       }
       
-      const existingUserByEmail = await storage.getUserByEmail(email);
-      if (existingUserByEmail) {
-        return res.status(409).json({ message: "Email already registered" });
+      // Check if email exists (if your storage has this method)
+      try {
+        const existingUserByEmail = await storage.getUserByEmail(email);
+        if (existingUserByEmail) {
+          return res.status(409).json({ message: "Email already registered" });
+        }
+      } catch (e) {
+        // If getUserByEmail is not implemented, just continue
+        console.log("getUserByEmail not implemented, skipping email check");
       }
       
       const user = await storage.createUser(validationResult.data);
+      
+      // Set user in session
+      if (req.session) {
+        req.session.userId = user.id;
+      }
       
       // Remove password from the response
       const { password, ...userWithoutPassword } = user;
@@ -70,6 +86,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Registration error:", error);
       return res.status(500).json({ message: "Internal server error" });
+    }
+  });
+  
+  app.post("/api/auth/logout", (req: Request, res: Response) => {
+    if (req.session) {
+      req.session.destroy((err) => {
+        if (err) {
+          console.error("Logout error:", err);
+          return res.status(500).json({ message: "Logout failed" });
+        }
+        
+        res.clearCookie("connect.sid");
+        return res.json({ message: "Logged out successfully" });
+      });
+    } else {
+      return res.json({ message: "Logged out successfully" });
+    }
+  });
+  
+  app.get("/api/auth/me", async (req: Request, res: Response) => {
+    try {
+      // Check if user is logged in
+      if (!req.session || !req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      // Get user data
+      const user = await storage.getUserById(req.session.userId);
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+      
+      // Return user data (excluding password)
+      const { password: _, ...userData } = user;
+      return res.json(userData);
+    } catch (error) {
+      console.error("Get current user error:", error);
+      return res.status(500).json({ message: "Failed to get current user" });
     }
   });
   
@@ -82,7 +136,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid user ID" });
       }
       
-      const user = await storage.getUser(userId);
+      const user = await storage.getUserById(userId);
       
       if (!user) {
         return res.status(404).json({ message: "User not found" });
@@ -98,77 +152,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.patch("/api/users/:id/points", async (req: Request, res: Response) => {
+  // User profile update endpoint
+  app.patch("/api/users/:id", async (req: Request, res: Response) => {
     try {
       const userId = parseInt(req.params.id);
-      const { points } = req.body;
       
-      if (isNaN(userId) || typeof points !== "number") {
-        return res.status(400).json({ message: "Invalid user ID or points" });
+      if (isNaN(userId)) {
+        return res.status(400).json({ message: "Invalid user ID" });
       }
       
-      const user = await storage.updateUserPoints(userId, points);
-      
-      if (!user) {
+      // Check if user exists
+      const existingUser = await storage.getUserById(userId);
+      if (!existingUser) {
         return res.status(404).json({ message: "User not found" });
       }
       
-      // Remove password from the response
-      const { password, ...userWithoutPassword } = user;
+      // Update user data
+      const updatedUser = await storage.updateUser(userId, req.body);
+      
+      // Remove password from response
+      const { password, ...userWithoutPassword } = updatedUser;
       
       return res.status(200).json(userWithoutPassword);
     } catch (error) {
-      console.error("Update user points error:", error);
-      return res.status(500).json({ message: "Internal server error" });
-    }
-  });
-  
-  app.patch("/api/users/:id/level", async (req: Request, res: Response) => {
-    try {
-      const userId = parseInt(req.params.id);
-      const { level } = req.body;
-      
-      if (isNaN(userId) || typeof level !== "number") {
-        return res.status(400).json({ message: "Invalid user ID or level" });
-      }
-      
-      const user = await storage.updateUserLevel(userId, level);
-      
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      
-      // Remove password from the response
-      const { password, ...userWithoutPassword } = user;
-      
-      return res.status(200).json(userWithoutPassword);
-    } catch (error) {
-      console.error("Update user level error:", error);
-      return res.status(500).json({ message: "Internal server error" });
-    }
-  });
-  
-  app.patch("/api/users/:id/traits", async (req: Request, res: Response) => {
-    try {
-      const userId = parseInt(req.params.id);
-      const { traits } = req.body;
-      
-      if (isNaN(userId) || !traits || typeof traits !== "object") {
-        return res.status(400).json({ message: "Invalid user ID or traits" });
-      }
-      
-      const user = await storage.updateUserTraits(userId, traits);
-      
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      
-      // Remove password from the response
-      const { password, ...userWithoutPassword } = user;
-      
-      return res.status(200).json(userWithoutPassword);
-    } catch (error) {
-      console.error("Update user traits error:", error);
+      console.error("Update user error:", error);
       return res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -197,9 +204,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.post("/api/future-profiles", async (req: Request, res: Response) => {
     try {
+      console.log("Creating future profile with data:", JSON.stringify(req.body, null, 2));
+      
+      // Ensure userId is within PostgreSQL integer range
+      if (req.body.userId && typeof req.body.userId === 'number') {
+        req.body.userId = Math.min(req.body.userId, 2147483647);
+      }
+      
+      // Handle skills and hobbies if they're strings
+      if (req.body.skills && typeof req.body.skills === 'string') {
+        req.body.skills = req.body.skills.split(',').map((s: string) => s.trim());
+      }
+      
+      if (req.body.hobbies && typeof req.body.hobbies === 'string') {
+        req.body.hobbies = req.body.hobbies.split(',').map((s: string) => s.trim());
+      }
+      
       const validationResult = insertFutureProfileSchema.safeParse(req.body);
       
       if (!validationResult.success) {
+        console.error("Validation error:", validationResult.error.format());
         return res.status(400).json({ 
           message: "Invalid future profile data",
           errors: validationResult.error.format() 
@@ -207,36 +231,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const profile = await storage.createFutureProfile(validationResult.data);
+      console.log("Profile created successfully:", JSON.stringify(profile, null, 2));
       
       return res.status(201).json(profile);
     } catch (error) {
       console.error("Create future profile error:", error);
-      return res.status(500).json({ message: "Internal server error" });
+      return res.status(500).json({ 
+        message: "Internal server error", 
+        details: error instanceof Error ? error.message : String(error) 
+      });
     }
   });
   
-  app.patch("/api/future-profiles/:id", async (req: Request, res: Response) => {
-    try {
-      const profileId = parseInt(req.params.id);
-      
-      if (isNaN(profileId)) {
-        return res.status(400).json({ message: "Invalid profile ID" });
-      }
-      
-      const profile = await storage.updateFutureProfile(profileId, req.body);
-      
-      if (!profile) {
-        return res.status(404).json({ message: "Future profile not found" });
-      }
-      
-      return res.status(200).json(profile);
-    } catch (error) {
-      console.error("Update future profile error:", error);
-      return res.status(500).json({ message: "Internal server error" });
-    }
-  });
-  
-  // Goals routes
+  // Goal routes
   app.get("/api/goals/:id", async (req: Request, res: Response) => {
     try {
       const goalId = parseInt(req.params.id);
@@ -245,7 +252,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid goal ID" });
       }
       
-      const goal = await storage.getGoal(goalId);
+      const goal = await storage.getGoalById(goalId);
       
       if (!goal) {
         return res.status(404).json({ message: "Goal not found" });
@@ -266,7 +273,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid user ID" });
       }
       
-      const goals = await storage.getGoalsByUser(userId);
+      const goals = await storage.getGoalsByUserId(userId);
       
       return res.status(200).json(goals);
     } catch (error) {
@@ -295,49 +302,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.patch("/api/goals/:id", async (req: Request, res: Response) => {
-    try {
-      const goalId = parseInt(req.params.id);
-      
-      if (isNaN(goalId)) {
-        return res.status(400).json({ message: "Invalid goal ID" });
-      }
-      
-      const goal = await storage.updateGoal(goalId, req.body);
-      
-      if (!goal) {
-        return res.status(404).json({ message: "Goal not found" });
-      }
-      
-      return res.status(200).json(goal);
-    } catch (error) {
-      console.error("Update goal error:", error);
-      return res.status(500).json({ message: "Internal server error" });
-    }
-  });
-  
-  app.delete("/api/goals/:id", async (req: Request, res: Response) => {
-    try {
-      const goalId = parseInt(req.params.id);
-      
-      if (isNaN(goalId)) {
-        return res.status(400).json({ message: "Invalid goal ID" });
-      }
-      
-      const success = await storage.deleteGoal(goalId);
-      
-      if (!success) {
-        return res.status(404).json({ message: "Goal not found" });
-      }
-      
-      return res.status(204).send();
-    } catch (error) {
-      console.error("Delete goal error:", error);
-      return res.status(500).json({ message: "Internal server error" });
-    }
-  });
-  
-  // Habits routes
+  // Habit routes
   app.get("/api/habits/:id", async (req: Request, res: Response) => {
     try {
       const habitId = parseInt(req.params.id);
@@ -346,7 +311,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid habit ID" });
       }
       
-      const habit = await storage.getHabit(habitId);
+      const habit = await storage.getHabitById(habitId);
       
       if (!habit) {
         return res.status(404).json({ message: "Habit not found" });
@@ -367,7 +332,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid user ID" });
       }
       
-      const habits = await storage.getHabitsByUser(userId);
+      const habits = await storage.getHabitsByUserId(userId);
       
       return res.status(200).json(habits);
     } catch (error) {
@@ -396,235 +361,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.patch("/api/habits/:id", async (req: Request, res: Response) => {
-    try {
-      const habitId = parseInt(req.params.id);
-      
-      if (isNaN(habitId)) {
-        return res.status(400).json({ message: "Invalid habit ID" });
-      }
-      
-      const habit = await storage.updateHabit(habitId, req.body);
-      
-      if (!habit) {
-        return res.status(404).json({ message: "Habit not found" });
-      }
-      
-      return res.status(200).json(habit);
-    } catch (error) {
-      console.error("Update habit error:", error);
-      return res.status(500).json({ message: "Internal server error" });
-    }
-  });
-  
-  app.patch("/api/habits/:id/complete", async (req: Request, res: Response) => {
-    try {
-      const habitId = parseInt(req.params.id);
-      const { completed } = req.body;
-      
-      if (isNaN(habitId) || typeof completed !== "boolean") {
-        return res.status(400).json({ message: "Invalid habit ID or completed state" });
-      }
-      
-      const habit = await storage.completeHabit(habitId, completed);
-      
-      if (!habit) {
-        return res.status(404).json({ message: "Habit not found" });
-      }
-      
-      return res.status(200).json(habit);
-    } catch (error) {
-      console.error("Complete habit error:", error);
-      return res.status(500).json({ message: "Internal server error" });
-    }
-  });
-  
-  app.delete("/api/habits/:id", async (req: Request, res: Response) => {
-    try {
-      const habitId = parseInt(req.params.id);
-      
-      if (isNaN(habitId)) {
-        return res.status(400).json({ message: "Invalid habit ID" });
-      }
-      
-      const success = await storage.deleteHabit(habitId);
-      
-      if (!success) {
-        return res.status(404).json({ message: "Habit not found" });
-      }
-      
-      return res.status(204).send();
-    } catch (error) {
-      console.error("Delete habit error:", error);
-      return res.status(500).json({ message: "Internal server error" });
-    }
-  });
-  
   // Journal routes
-  app.get("/api/journals/:id", async (req: Request, res: Response) => {
-    try {
-      const journalId = parseInt(req.params.id);
-      
-      if (isNaN(journalId)) {
-        return res.status(400).json({ message: "Invalid journal ID" });
-      }
-      
-      const journal = await storage.getJournal(journalId);
-      
-      if (!journal) {
-        return res.status(404).json({ message: "Journal not found" });
-      }
-      
-      return res.status(200).json(journal);
-    } catch (error) {
-      console.error("Get journal error:", error);
-      return res.status(500).json({ message: "Internal server error" });
-    }
-  });
-  
-  app.get("/api/users/:userId/journals", async (req: Request, res: Response) => {
-    try {
-      const userId = parseInt(req.params.userId);
-      const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
-      
-      if (isNaN(userId)) {
-        return res.status(400).json({ message: "Invalid user ID" });
-      }
-      
-      const journals = await storage.getJournalsByUser(userId, limit);
-      
-      return res.status(200).json(journals);
-    } catch (error) {
-      console.error("Get journals by user error:", error);
-      return res.status(500).json({ message: "Internal server error" });
-    }
-  });
-  
   app.post("/api/journals", async (req: Request, res: Response) => {
     try {
-      // Create a schema specifically for the request body which doesn't include sentiment
-      const createJournalSchema = insertJournalSchema.omit({ sentiment: true });
+      console.log("Received journal data:", JSON.stringify(req.body, null, 2));
       
-      const validationResult = createJournalSchema.safeParse(req.body);
+      // Extract the basic required fields
+      const { userId, content, date } = req.body;
       
-      if (!validationResult.success) {
+      if (!userId || !content) {
         return res.status(400).json({ 
-          message: "Invalid journal data",
-          errors: validationResult.error.format() 
+          message: "Missing required fields: userId and content are required"
         });
       }
       
-      const journalData = validationResult.data;
+      // Extract optional metadata if present
+      const metadata = req.body.metadata || {};
       
       // Analyze sentiment
-      const sentiment = await analyzeSentiment(journalData.content);
+      const sentiment = await analyzeSentiment(content);
+      console.log("Sentiment analysis result:", sentiment);
       
       // Create the journal with the sentiment data
       const journal = await storage.createJournal({
-        ...journalData,
-        sentiment
+        userId,
+        content,
+        date: date || new Date().toISOString(),
+        sentiment,
+        metadata
       });
       
+      console.log("Journal created successfully:", journal);
       return res.status(201).json(journal);
     } catch (error) {
       console.error("Create journal error:", error);
-      return res.status(500).json({ message: "Internal server error" });
-    }
-  });
-  
-  app.patch("/api/journals/:id", async (req: Request, res: Response) => {
-    try {
-      const journalId = parseInt(req.params.id);
-      
-      if (isNaN(journalId)) {
-        return res.status(400).json({ message: "Invalid journal ID" });
-      }
-      
-      let updateData: Partial<InsertJournal> = req.body;
-      
-      // If content is being updated, re-analyze sentiment
-      if (req.body.content) {
-        const sentiment = await analyzeSentiment(req.body.content);
-        updateData = { ...updateData, sentiment };
-      }
-      
-      const journal = await storage.updateJournal(journalId, updateData);
-      
-      if (!journal) {
-        return res.status(404).json({ message: "Journal not found" });
-      }
-      
-      return res.status(200).json(journal);
-    } catch (error) {
-      console.error("Update journal error:", error);
-      return res.status(500).json({ message: "Internal server error" });
-    }
-  });
-  
-  app.delete("/api/journals/:id", async (req: Request, res: Response) => {
-    try {
-      const journalId = parseInt(req.params.id);
-      
-      if (isNaN(journalId)) {
-        return res.status(400).json({ message: "Invalid journal ID" });
-      }
-      
-      const success = await storage.deleteJournal(journalId);
-      
-      if (!success) {
-        return res.status(404).json({ message: "Journal not found" });
-      }
-      
-      return res.status(204).send();
-    } catch (error) {
-      console.error("Delete journal error:", error);
-      return res.status(500).json({ message: "Internal server error" });
+      return res.status(500).json({ 
+        message: "Internal server error", 
+        details: error instanceof Error ? error.message : String(error)
+      });
     }
   });
   
   // Conversation routes
-  app.get("/api/conversations/:id", async (req: Request, res: Response) => {
-    try {
-      const conversationId = parseInt(req.params.id);
-      
-      if (isNaN(conversationId)) {
-        return res.status(400).json({ message: "Invalid conversation ID" });
-      }
-      
-      const conversation = await storage.getConversation(conversationId);
-      
-      if (!conversation) {
-        return res.status(404).json({ message: "Conversation not found" });
-      }
-      
-      return res.status(200).json(conversation);
-    } catch (error) {
-      console.error("Get conversation error:", error);
-      return res.status(500).json({ message: "Internal server error" });
-    }
-  });
-  
-  app.get("/api/users/:userId/conversation", async (req: Request, res: Response) => {
-    try {
-      const userId = parseInt(req.params.userId);
-      
-      if (isNaN(userId)) {
-        return res.status(400).json({ message: "Invalid user ID" });
-      }
-      
-      const conversation = await storage.getConversationByUser(userId);
-      
-      if (!conversation) {
-        return res.status(404).json({ message: "Conversation not found" });
-      }
-      
-      return res.status(200).json(conversation);
-    } catch (error) {
-      console.error("Get conversation by user error:", error);
-      return res.status(500).json({ message: "Internal server error" });
-    }
-  });
-  
   app.post("/api/conversations", async (req: Request, res: Response) => {
     try {
       const validationSchema = z.object({
@@ -645,7 +423,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const timestamp = new Date().toISOString();
       
       // Check if user already has a conversation
-      let conversation = await storage.getConversationByUser(userId);
+      let conversation = await storage.getConversationByUserId(userId);
       
       if (!conversation) {
         // Create a new conversation
@@ -657,14 +435,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
               content: message,
               timestamp
             }
-          ],
-          lastUpdated: new Date()
+          ]
         });
         
         return res.status(201).json(conversation);
       } else {
         // Add message to existing conversation
-        const updatedConversation = await storage.updateConversation(
+        const updatedConversation = await storage.addMessageToConversation(
           conversation.id,
           {
             role: "user",
@@ -691,18 +468,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Get the current conversation
-      const conversation = await storage.getConversation(conversationId);
+      const conversation = await storage.getConversationById(conversationId);
       
       if (!conversation) {
         return res.status(404).json({ message: "Conversation not found" });
       }
       
-      // TODO: Generate AI response using OpenAI service
-      // For now, we'll use a mock response
-      const aiResponse = "I'm your AI coach and I'm here to help you reach your goals. Let's work together to create a plan that fits your lifestyle.";
+      // Import the OpenAI service
+      const { generateCoachResponse } = await import("./services/openai-service");
+      
+      // Prepare conversation history for the AI
+      const conversationHistory = Array.isArray(conversation.messages) 
+        ? conversation.messages.map(msg => ({
+            role: msg.role,
+            content: msg.content
+          }))
+        : [];
+      
+      // Generate AI response using OpenAI
+      console.log("Generating AI coach response...");
+      
+      const aiResponse = await generateCoachResponse(
+        message,
+        [
+          { role: "system", content: "You are an AI life coach." },
+          ...conversationHistory
+        ],
+        []
+      );
+      console.log("AI response generated:", aiResponse);
       
       // Add AI response to conversation
-      const updatedConversation = await storage.updateConversation(
+      const updatedConversation = await storage.addMessageToConversation(
         conversationId,
         {
           role: "assistant",
@@ -714,6 +511,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(200).json(updatedConversation);
     } catch (error) {
       console.error("Conversation reply error:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  });
+  
+  // Goal plan generation endpoint
+  app.post("/api/coach/goal-plan", async (req: Request, res: Response) => {
+    try {
+      const { goalDescription, userContext } = req.body;
+      
+      if (!goalDescription) {
+        return res.status(400).json({ message: "Goal description is required" });
+      }
+      
+      // Import the OpenAI service
+      const { generateGoalPlan } = await import("./services/openai-service");
+      
+      // Generate goal plan
+      console.log("Generating goal plan for:", goalDescription);
+      const goalPlan = await generateGoalPlan(goalDescription, userContext);
+      
+      return res.status(200).json({ plan: goalPlan });
+    } catch (error) {
+      console.error("Goal plan generation error:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  });
+  
+  // Habit plan generation endpoint
+  app.post("/api/coach/habit-plan", async (req: Request, res: Response) => {
+    try {
+      const { habitDescription } = req.body;
+      
+      if (!habitDescription) {
+        return res.status(400).json({ message: "Habit description is required" });
+      }
+      
+      // Import the OpenAI service
+      const { generateHabitPlan } = await import("./services/openai-service");
+      
+      // Generate habit plan
+      console.log("Generating habit plan for:", habitDescription);
+      const habitPlan = await generateHabitPlan(habitDescription);
+      
+      return res.status(200).json({ plan: habitPlan });
+    } catch (error) {
+      console.error("Habit plan generation error:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  });
+  
+  // Future prediction endpoint
+  app.get("/api/predictions/:userId/:timeframe", async (req: Request, res: Response) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const timeframe = req.params.timeframe as "1_month" | "6_months" | "1_year" | "5_years";
+      
+      if (isNaN(userId) || !["1_month", "6_months", "1_year", "5_years"].includes(timeframe)) {
+        return res.status(400).json({ message: "Invalid user ID or timeframe" });
+      }
+      
+      // Import the prediction service
+      const { generateFuturePrediction } = await import("./services/future-prediction-service");
+      
+      // Generate prediction
+      const prediction = await generateFuturePrediction(userId, timeframe);
+      
+      return res.status(200).json(prediction);
+    } catch (error) {
+      console.error("Future prediction error:", error);
       return res.status(500).json({ message: "Internal server error" });
     }
   });

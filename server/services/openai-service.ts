@@ -1,200 +1,187 @@
-import OpenAI from "openai";
-import { Sentiment } from "@shared/schema";
+import { config } from "../config";
 
-// Initialize OpenAI with API key from environment variables
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || "sk-mock-key-for-development" });
-
-// The newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
-const MODEL = "gpt-4o";
-
-// Analyze sentiment of a journal entry
-export async function analyzeSentiment(text: string): Promise<Sentiment> {
-  try {
-    const response = await openai.chat.completions.create({
-      model: MODEL,
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are a sentiment analysis expert. Analyze the sentiment of the text and provide a rating from 1 to 5 stars and a confidence score between 0 and 1. Respond with JSON in this format: { 'rating': number, 'confidence': number }",
-        },
-        {
-          role: "user",
-          content: text,
-        },
-      ],
-      response_format: { type: "json_object" },
-    });
-
-    const result = JSON.parse(response.choices[0].message.content);
-
-    return {
-      rating: Math.max(1, Math.min(5, Math.round(result.rating))),
-      confidence: Math.max(0, Math.min(1, result.confidence)),
-    };
-  } catch (error) {
-    console.error("Sentiment analysis error:", error);
-    
-    // Fallback sentiment in case of API error
-    return {
-      rating: 3,
-      confidence: 0.5,
-    };
+// Mock implementation for development
+export async function analyzeSentiment(text: string) {
+  console.log("Mock sentiment analysis for:", text.substring(0, 50) + "...");
+  
+  // Generate a random sentiment between 1-5
+  const rating = Math.floor(Math.random() * 5) + 1;
+  let analysis = "";
+  
+  if (rating >= 4) {
+    analysis = "The text expresses positive emotions and optimism.";
+  } else if (rating >= 3) {
+    analysis = "The text is neutral in tone with balanced emotions.";
+  } else {
+    analysis = "The text expresses some negative emotions or concerns.";
   }
+  
+  return {
+    rating,
+    analysis
+  };
 }
 
-// Generate AI coach response
+// Mock implementation for development
 export async function generateCoachResponse(
   userMessage: string,
-  conversationHistory: { role: string; content: string }[],
-  userGoals?: string[]
-): Promise<string> {
-  try {
-    // Prepare conversation history for the context
-    const messages = [
-      {
-        role: "system",
-        content: `You are an AI life coach named Future Coach. Your goal is to help the user achieve their personal and professional goals through positive reinforcement, accountability, and actionable advice.
-          
-          ${userGoals && userGoals.length > 0 
-            ? `The user has set the following goals: ${userGoals.join(", ")}.` 
-            : "The user is working on setting and achieving personal growth goals."}
-          
-          Keep your responses conversational, empathetic, and focused on the user's needs. Provide practical advice that's easy to implement. Be encouraging but realistic.`,
-      },
-      ...conversationHistory.map(msg => ({
-        role: msg.role as "user" | "assistant",
-        content: msg.content
-      })),
-      {
-        role: "user",
-        content: userMessage,
-      },
-    ];
-
-    const response = await openai.chat.completions.create({
-      model: MODEL,
-      messages,
-      max_tokens: 300,
-      temperature: 0.7,
-    });
-
-    return response.choices[0].message.content || "I'm here to help you achieve your goals. What would you like to work on today?";
-  } catch (error) {
-    console.error("AI coach response error:", error);
-    return "I'm having trouble connecting right now. Let's try again in a moment.";
+  conversationHistory: Array<{ role: string; content: string }>,
+  userGoals: string[] = []
+) {
+  console.log("Mock coach response for:", userMessage.substring(0, 50) + "...");
+  
+  // Simple response templates based on message content
+  if (userMessage.toLowerCase().includes("goal")) {
+    return "Setting clear goals is important for personal growth. What specific goal would you like to work on? I can help you break it down into manageable steps.";
   }
+  
+  if (userMessage.toLowerCase().includes("habit")) {
+    return "Habits are the foundation of lasting change. What habit are you trying to build or break? Remember that consistency is more important than intensity when forming new habits.";
+  }
+  
+  if (userMessage.toLowerCase().includes("stress") || userMessage.toLowerCase().includes("anxiety")) {
+    return "I'm sorry to hear you're feeling stressed. Taking time for self-care is important. Have you tried any relaxation techniques like deep breathing or mindfulness meditation? Even 5 minutes can make a difference.";
+  }
+  
+  if (userMessage.toLowerCase().includes("motivat")) {
+    return "Finding motivation can be challenging. Try connecting with your deeper 'why' - the reason behind your goals. Also, remember that motivation often follows action, not the other way around. Taking small steps can build momentum.";
+  }
+  
+  // Default response
+  return "Thank you for sharing that with me. I'm here to support your personal growth journey. What specific area would you like to focus on today?";
 }
 
-// Generate future self insights based on user traits and timeline
-export async function generateFutureInsights(
-  userTraits: Record<string, any>,
-  timelineYears: number
-): Promise<Record<string, string>> {
-  try {
-    const prompt = `Based on the following user traits and a timeline of ${timelineYears} years in the future, generate realistic projections for their career, education, health, wealth, relationships, and location. Provide specific and personalized details.
-    
-    User traits: ${JSON.stringify(userTraits)}
-    
-    Respond with a JSON object with the following keys: career, education, health, wealth, relationships, location.`;
+// Mock implementation for development
+export async function generateGoalPlan(goalDescription: string, userContext?: string) {
+  console.log("Mock goal plan for:", goalDescription);
+  
+  return `# Goal Plan: ${goalDescription}
 
-    const response = await openai.chat.completions.create({
-      model: MODEL,
-      messages: [
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-      response_format: { type: "json_object" },
-    });
+## Goal Clarity
+Your goal is to ${goalDescription}. This is an important step in your personal development journey.
 
-    const insights = JSON.parse(response.choices[0].message.content);
-    return insights;
-  } catch (error) {
-    console.error("Future insights error:", error);
-    
-    // Fallback insights in case of API error
-    return {
-      career: `In ${timelineYears} years, you could advance in your current field with consistent effort.`,
-      education: `You might complete additional certifications or training in the next ${timelineYears} years.`,
-      health: "Maintaining regular exercise and healthy habits will improve your overall wellbeing.",
-      wealth: `With disciplined saving and investing, your financial situation could improve significantly in ${timelineYears} years.`,
-      relationships: "Building and nurturing meaningful connections will enhance your support network.",
-      location: "You may find opportunities in areas with growth in your industry."
-    };
-  }
+## 7-Day Action Plan
+
+### Day 1: Assessment & Planning
+- Assess your current skills/knowledge related to this goal
+- Research best practices and success stories
+- Set 3 specific, measurable sub-goals
+- Identify potential obstacles and solutions
+
+### Day 2: Skill Building - Fundamentals
+- Identify 3 core skills needed for your goal
+- Spend 30-60 minutes practicing the most important skill
+- Find learning resources (videos, articles, courses)
+
+### Day 3: Environment Setup
+- Organize your physical space to support your goal
+- Gather necessary tools and resources
+- Remove or minimize potential distractions
+- Tell a supportive friend about your goal
+
+### Day 4: Implementation - First Steps
+- Complete one significant task toward your goal
+- Apply what you learned on Day 2
+- Document your process and results
+
+### Day 5: Review & Adjust
+- Review your progress so far
+- Identify what's working well
+- Note challenges and brainstorm solutions
+- Adjust your approach based on learnings
+
+### Day 6: Skill Building - Advanced
+- Learn one more advanced technique
+- Practice combining skills you've developed
+- Connect with others pursuing similar goals
+
+### Day 7: Habit Integration & Planning
+- Create a specific plan for week 2
+- Identify a trigger for your new habit
+- Set up accountability system
+- Schedule specific times for practice
+
+## Resources Needed
+- Tools specific to your goal
+- Learning materials (books, courses, videos)
+- Tracking system (journal, app, spreadsheet)
+- Accountability partner or community
+
+## Success Metrics
+- Completion of daily actions
+- Skill improvement
+- Increased confidence
+- Measurable progress toward goal
+- Habit formation
+
+## Next Steps
+After completing this 7-day plan, you can:
+1. Continue with more advanced skills
+2. Increase duration or intensity
+3. Set more challenging sub-goals
+4. Find a mentor or community for support`;
 }
 
-// Impact simulator projections
-export async function simulateImpact(
-  dailyLearning: number,
-  weeklyExercise: number,
-  savingsPercent: number,
-  timelineYears: number
-): Promise<Record<string, string>> {
-  try {
-    const prompt = `Simulate the impact of the following daily habits over ${timelineYears} years:
-    
-    - Daily learning time: ${dailyLearning} minutes per day
-    - Weekly exercise: ${weeklyExercise} days per week
-    - Income saved: ${savingsPercent}% of income
-    
-    Respond with a JSON object with the following keys: careerGrowth (percentage), healthImprovement (percentage), wealthAccumulation (dollar amount assuming $60,000 starting salary).`;
+// Mock implementation for development
+export async function generateHabitPlan(habitDescription: string) {
+  console.log("Mock habit plan for:", habitDescription);
+  
+  return `# Habit Building Plan: ${habitDescription}
 
-    const response = await openai.chat.completions.create({
-      model: MODEL,
-      messages: [
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-      response_format: { type: "json_object" },
-    });
+## 1. Habit Clarity
+**Your habit**: ${habitDescription}
 
-    const impact = JSON.parse(response.choices[0].message.content);
-    return impact;
-  } catch (error) {
-    console.error("Impact simulation error:", error);
-    
-    // Fallback impact in case of API error
-    return {
-      careerGrowth: `+${Math.min(25, dailyLearning / 5)}% career growth per year`,
-      healthImprovement: `+${Math.min(20, weeklyExercise * 3)}% health metrics improvement`,
-      wealthAccumulation: `$${Math.round(60000 * (savingsPercent / 100) * timelineYears * (1 + 0.07) ** timelineYears)} saved in ${timelineYears} years`
-    };
-  }
-}
+This habit will help you make consistent progress toward your goals, improve your wellbeing, and develop positive routines that support your long-term success.
 
-// Generate motivational quote
-export async function generateMotivationalQuote(): Promise<{ quote: string; author: string }> {
-  try {
-    const prompt = "Generate an inspiring, motivational quote about personal growth, self-improvement, or achieving goals. Include the author's name. Respond with a JSON object with 'quote' and 'author' keys.";
+## 2. Implementation Intention
+* **When**: Choose a specific time of day that works best for this habit
+* **Where**: Select a consistent location
+* **Trigger**: Link this habit to an existing routine or cue
+* **Specific plan**: Create an "After I [existing habit], I will [new habit]" statement
 
-    const response = await openai.chat.completions.create({
-      model: MODEL,
-      messages: [
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-      response_format: { type: "json_object" },
-    });
+## 3. Starting Small
+* Begin with a version of the habit so small it seems almost too easy
+* Focus on consistency rather than perfection
+* Aim for just 2 minutes of the activity to establish the habit loop
+* Gradually increase duration or difficulty as the habit becomes established
 
-    const result = JSON.parse(response.choices[0].message.content);
-    return {
-      quote: result.quote,
-      author: result.author,
-    };
-  } catch (error) {
-    console.error("Quote generation error:", error);
-    
-    // Fallback quote in case of API error
-    return {
-      quote: "The future belongs to those who believe in the beauty of their dreams.",
-      author: "Eleanor Roosevelt",
-    };
-  }
+## 4. Environment Design
+* Remove obstacles that might prevent you from doing the habit
+* Make the habit obvious and easy to start
+* Prepare your environment in advance
+* Create visual reminders or cues
+* Reduce friction between you and the habit
+
+## 5. Accountability System
+* Share your commitment with a friend or family member
+* Use a habit tracking app to monitor your progress
+* Consider finding an accountability partner
+* Schedule regular reviews of your habit progress
+* Make your commitment public if appropriate
+
+## 6. Tracking Method
+* Mark each successful day on a calendar or habit tracker
+* Track your streak to build momentum
+* Note how you feel after completing the habit
+* Record any obstacles or challenges you encounter
+* Measure progress toward your larger goal
+
+## 7. Reward System
+* Celebrate small wins along the way
+* Create immediate rewards for completing your habit
+* Link the habit to something you enjoy
+* Set milestone rewards for longer streaks
+* Notice and appreciate the positive changes resulting from your habit
+
+## Common Obstacles and Solutions
+* **Obstacle**: "I forget to do it"
+  * **Solution**: Create obvious visual reminders; link to an existing habit
+* **Obstacle**: "I don't feel motivated"
+  * **Solution**: Make it smaller; focus on the 2-minute starting ritual
+* **Obstacle**: "My routine gets disrupted"
+  * **Solution**: Create a backup plan for unusual days; focus on getting back on track
+* **Obstacle**: "It feels like a chore"
+  * **Solution**: Find ways to make it more enjoyable; focus on the positive feelings afterward
+
+Remember, consistency is more important than perfection. Start small and build gradually!`;
 }

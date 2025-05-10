@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="400" viewBox="0 0 800 400">
+  <defs>
+    <linearGradient id="bg-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f9fafb" />
+      <stop offset="100%" stop-color="#f3f4f6" />
+    </linearGradient>
+    <linearGradient id="card-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4F46E5" />
+      <stop offset="100%" stop-color="#8B5CF6" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="800" height="400" fill="url(#bg-gradient)" />
+  
+  <!-- Header -->
+  <rect x="0" y="0" width="800" height="60" fill="white" />
+  <text x="20" y="35" font-family="Arial" font-size="20" font-weight="bold" fill="#111827">Dashboard</text>
+  
+  <!-- Stats Cards -->
+  <rect x="20" y="80" width="180" height="80" rx="8" fill="white" stroke="#e5e7eb" stroke-width="1" />
+  <text x="30" y="100" font-family="Arial" font-size="12" fill="#6b7280">Goals</text>
+  <text x="30" y="130" font-family="Arial" font-size="24" font-weight="bold" fill="#111827">3</text>
+  <circle cx="160" cy="110" r="15" fill="#EBF5FF" />
+  <path d="M160 105 L160 115 M155 110 L165 110" stroke="#3B82F6" stroke-width="2" />
+  
+  <rect x="210" y="80" width="180" height="80" rx="8" fill="white" stroke="#e5e7eb" stroke-width="1" />
+  <text x="220" y="100" font-family="Arial" font-size="12" fill="#6b7280">Habits</text>
+  <text x="220" y="130" font-family="Arial" font-size="24" font-weight="bold" fill="#111827">5</text>
+  <circle cx="350" cy="110" r="15" fill="#ECFDF5" />
+  <path d="M345 110 L350 115 L355 105" stroke="#10B981" stroke-width="2" />
+  
+  <rect x="400" y="80" width="180" height="80" rx="8" fill="white" stroke="#e5e7eb" stroke-width="1" />
+  <text x="410" y="100" font-family="Arial" font-size="12" fill="#6b7280">Journal Entries</text>
+  <text x="410" y="130" font-family="Arial" font-size="24" font-weight="bold" fill="#111827">12</text>
+  <circle cx="540" cy="110" r="15" fill="#F5F3FF" />
+  <path d="M535 110 L545 110 M540 105 L540 115" stroke="#8B5CF6" stroke-width="2" />
+  
+  <rect x="590" y="80" width="180" height="80" rx="8" fill="white" stroke="#e5e7eb" stroke-width="1" />
+  <text x="600" y="100" font-family="Arial" font-size="12" fill="#6b7280">Points</text>
+  <text x="600" y="130" font-family="Arial" font-size="24" font-weight="bold" fill="#111827">120</text>
+  <circle cx="730" cy="110" r="15" fill="#FEF3C7" />
+  <path d="M730 105 L730 115 M725 105 L735 115" stroke="#F59E0B" stroke-width="2" />
+  
+  <!-- Feature Cards -->
+  <rect x="20" y="180" width="250" height="200" rx="8" fill="white" stroke="#e5e7eb" stroke-width="1" />
+  <text x="40" y="210" font-family="Arial" font-size="16" font-weight="bold" fill="#111827">Goals</text>
+  <text x="40" y="230" font-family="Arial" font-size="12" fill="#6b7280">Set and track your personal goals</text>
+  <rect x="40" y="250" width="210" height="8" rx="4" fill="#f3f4f6" />
+  <rect x="40" y="250" width="150" height="8" rx="4" fill="#3B82F6" />
+  <rect x="40" y="270" width="80" height="24" rx="4" fill="#EBF5FF" />
+  <text x="55" y="286" font-family="Arial" font-size="12" fill="#3B82F6">Manage</text>
+  
+  <rect x="280" y="180" width="250" height="200" rx="8" fill="white" stroke="#e5e7eb" stroke-width="1" />
+  <text x="300" y="210" font-family="Arial" font-size="16" font-weight="bold" fill="#111827">Habits</text>
+  <text x="300" y="230" font-family="Arial" font-size="12" fill="#6b7280">Build positive habits for success</text>
+  <rect x="300" y="250" width="210" height="8" rx="4" fill="#f3f4f6" />
+  <rect x="300" y="250" width="120" height="8" rx="4" fill="#10B981" />
+  <rect x="300" y="270" width="80" height="24" rx="4" fill="#ECFDF5" />
+  <text x="315" y="286" font-family="Arial" font-size="12" fill="#10B981">Manage</text>
+  
+  <rect x="540" y="180" width="250" height="200" rx="8" fill="white" stroke="#e5e7eb" stroke-width="1" />
+  <text x="560" y="210" font-family="Arial" font-size="16" font-weight="bold" fill="#111827">Journal</text>
+  <text x="560" y="230" font-family="Arial" font-size="12" fill="#6b7280">Record your thoughts and progress</text>
+  <rect x="560" y="250" width="210" height="8" rx="4" fill="#f3f4f6" />
+  <rect x="560" y="250" width="180" height="8" rx="4" fill="#8B5CF6" />
+  <rect x="560" y="270" width="80" height="24" rx="4" fill="#F5F3FF" />
+  <text x="575" y="286" font-family="Arial" font-size="12" fill="#8B5CF6">Write</text>
+</svg>

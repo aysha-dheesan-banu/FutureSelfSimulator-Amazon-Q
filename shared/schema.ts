@@ -1,155 +1,190 @@
-import { pgTable, text, serial, integer, boolean, jsonb, timestamp, primaryKey } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
-import { relations } from "drizzle-orm";
 
 // User schema
-export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
-  email: text("email").notNull().unique(),
-  name: text("name").notNull(),
-  avatarUrl: text("avatar_url"),
-  level: integer("level").default(1),
-  points: integer("points").default(0),
-  traits: jsonb("traits"), // Personality traits from quiz
-  preferences: jsonb("preferences"), // App preferences
+export interface User {
+  id: number;
+  username: string;
+  password?: string; // Only included in certain contexts, excluded from responses
+  email: string;
+  name?: string;
+  avatarUrl?: string;
+  level?: number;
+  points?: number;
+  traits?: {
+    openness?: number;
+    conscientiousness?: number;
+    extraversion?: number;
+    agreeableness?: number;
+    neuroticism?: number;
+  };
+  preferences?: {
+    gender?: 'male' | 'female' | 'other';
+    theme?: 'light' | 'dark';
+    notifications?: boolean;
+  };
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// Zod schema for user insertion
+export const insertUserSchema = z.object({
+  username: z.string().min(3).max(50),
+  password: z.string().min(6),
+  email: z.string().email(),
+  name: z.string().optional(),
+  avatarUrl: z.string().optional(),
+  level: z.number().default(1),
+  points: z.number().default(0),
+  traits: z.object({
+    openness: z.number().min(0).max(1).optional(),
+    conscientiousness: z.number().min(0).max(1).optional(),
+    extraversion: z.number().min(0).max(1).optional(),
+    agreeableness: z.number().min(0).max(1).optional(),
+    neuroticism: z.number().min(0).max(1).optional()
+  }).optional(),
+  preferences: z.object({
+    gender: z.enum(['male', 'female', 'other']).optional(),
+    theme: z.enum(['light', 'dark']).optional(),
+    notifications: z.boolean().optional()
+  }).optional()
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
-  email: true,
-  name: true,
-  avatarUrl: true,
+// Future Profile schema
+export interface FutureProfile {
+  id: number;
+  userId: number;
+  avatarUrl?: string;
+  career?: string;
+  education?: string;
+  health?: string;
+  wealth?: string;
+  relationships?: string;
+  location?: string;
+  personalGrowth?: string;
+  profileType?: string;
+  currentStream?: string;
+  degree?: string;
+  skills?: string[];
+  hobbies?: string[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// Zod schema for future profile insertion
+export const insertFutureProfileSchema = z.object({
+  userId: z.number(),
+  avatarUrl: z.string().optional(),
+  career: z.string().optional(),
+  education: z.string().optional(),
+  health: z.string().optional(),
+  wealth: z.string().optional(),
+  relationships: z.string().optional(),
+  location: z.string().optional(),
+  personalGrowth: z.string().optional(),
+  profileType: z.string().optional(),
+  currentStream: z.string().optional(),
+  degree: z.string().optional(),
+  skills: z.array(z.string()).optional(),
+  hobbies: z.array(z.string()).optional()
 });
 
-// Future Self Profile schema
-export const futureProfiles = pgTable("future_profiles", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
-  avatarUrl: text("avatar_url"),
-  career: text("career"),
-  education: text("education"),
-  health: text("health"),
-  wealth: text("wealth"),
-  relationships: text("relationships"),
-  location: text("location"),
-  personalGrowth: text("personal_growth"),
+// Conversation schema
+export interface Conversation {
+  id: number;
+  userId: number;
+  title?: string;
+  messages: Message[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// Message schema
+export interface Message {
+  id?: number;
+  conversationId?: number;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp?: string;
+}
+
+// Goal schema
+export interface Goal {
+  id: number;
+  userId: number;
+  title: string;
+  description?: string;
+  targetDate?: string;
+  progress?: number;
+  status?: 'not_started' | 'in_progress' | 'completed' | 'abandoned';
+  category?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// Zod schema for goal insertion
+export const insertGoalSchema = z.object({
+  userId: z.number(),
+  title: z.string().min(1),
+  description: z.string().optional(),
+  targetDate: z.string().optional(),
+  progress: z.number().min(0).max(100).default(0),
+  status: z.enum(['not_started', 'in_progress', 'completed', 'abandoned']).default('not_started'),
+  category: z.string().optional()
 });
 
-export const insertFutureProfileSchema = createInsertSchema(futureProfiles).pick({
-  userId: true,
-  avatarUrl: true,
-  career: true,
-  education: true,
-  health: true,
-  wealth: true,
-  relationships: true,
-  location: true,
-  personalGrowth: true,
-});
+// Habit schema
+export interface Habit {
+  id: number;
+  userId: number;
+  title: string;
+  description?: string;
+  frequency?: 'daily' | 'weekly' | 'monthly';
+  targetDays?: number[];
+  streak?: number;
+  longestStreak?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
-// Goals schema
-export const goals = pgTable("goals", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
-  title: text("title").notNull(),
-  description: text("description"),
-  category: text("category").notNull(), // career, health, finance, etc.
-  dueDate: timestamp("due_date"),
-  progress: integer("progress").default(0), // 0-100
-  completed: boolean("completed").default(false),
-});
-
-export const insertGoalSchema = createInsertSchema(goals).pick({
-  userId: true,
-  title: true,
-  description: true,
-  category: true,
-  dueDate: true,
-  progress: true,
-  completed: true,
-});
-
-// Habits schema
-export const habits = pgTable("habits", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
-  title: text("title").notNull(),
-  streakCount: integer("streak_count").default(0),
-  lastCompleted: timestamp("last_completed"),
-  weekLog: jsonb("week_log"), // Array of boolean for last 7 days
-});
-
-export const insertHabitSchema = createInsertSchema(habits).pick({
-  userId: true,
-  title: true,
-  streakCount: true,
-  lastCompleted: true,
-  weekLog: true,
+// Zod schema for habit insertion
+export const insertHabitSchema = z.object({
+  userId: z.number(),
+  title: z.string().min(1),
+  description: z.string().optional(),
+  frequency: z.enum(['daily', 'weekly', 'monthly']).default('daily'),
+  targetDays: z.array(z.number()).optional(),
+  streak: z.number().default(0),
+  longestStreak: z.number().default(0)
 });
 
 // Journal schema
-export const journals = pgTable("journals", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
-  content: text("content").notNull(),
-  date: timestamp("date").notNull(),
-  sentiment: jsonb("sentiment"), // Rating and confidence
-});
-
-export const insertJournalSchema = createInsertSchema(journals).pick({
-  userId: true,
-  content: true,
-  date: true,
-  sentiment: true,
-});
-
-// AI Coach Conversations schema
-export const conversations = pgTable("conversations", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
-  messages: jsonb("messages").notNull(), // Array of message objects
-  lastUpdated: timestamp("last_updated").notNull(),
-});
-
-export const insertConversationSchema = createInsertSchema(conversations).pick({
-  userId: true,
-  messages: true,
-  lastUpdated: true,
-});
-
-// Types
-export type User = typeof users.$inferSelect;
-export type InsertUser = z.infer<typeof insertUserSchema>;
-
-export type FutureProfile = typeof futureProfiles.$inferSelect;
-export type InsertFutureProfile = z.infer<typeof insertFutureProfileSchema>;
-
-export type Goal = typeof goals.$inferSelect;
-export type InsertGoal = z.infer<typeof insertGoalSchema>;
-
-export type Habit = typeof habits.$inferSelect;
-export type InsertHabit = z.infer<typeof insertHabitSchema>;
-
-export type Journal = typeof journals.$inferSelect;
-export type InsertJournal = z.infer<typeof insertJournalSchema>;
-
-export type Conversation = typeof conversations.$inferSelect;
-export type InsertConversation = z.infer<typeof insertConversationSchema>;
-
-// Extended types for the application
-export type Message = {
-  role: 'user' | 'assistant';
+export interface Journal {
+  id: number;
+  userId: number;
+  title?: string;
   content: string;
-  timestamp: string;
-};
+  date?: string;
+  sentiment?: {
+    rating: number;
+    analysis: string;
+  };
+  metadata?: Record<string, any>;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
-export type Sentiment = {
-  rating: number; // 1-5
-  confidence: number; // 0-1
-};
+// Type for journal insertion
+export type InsertJournal = Omit<Journal, 'id' | 'createdAt' | 'updatedAt'>;
 
-export type WeekLog = boolean[];
+// Zod schema for journal insertion
+export const insertJournalSchema = z.object({
+  userId: z.number(),
+  title: z.string().optional(),
+  content: z.string().min(1),
+  date: z.string().optional(),
+  sentiment: z.object({
+    rating: z.number().min(1).max(5),
+    analysis: z.string()
+  }).optional(),
+  metadata: z.record(z.any()).optional()
+});

@@ -67,6 +67,14 @@ export async function updateItem(
   id: number,
   updates: Record<string, any>
 ): Promise<Record<string, any> | undefined> {
+  // Skip if there are no updates
+  if (Object.keys(updates).length === 0) {
+    console.log("No updates provided for item:", id);
+    // Return the existing item instead
+    const existingItem = await getItem(tableName, id);
+    return existingItem;
+  }
+  
   // Create expression attribute names, values, and update expression
   const expressionAttributeNames: Record<string, string> = {};
   const expressionAttributeValues: Record<string, any> = {};
@@ -74,6 +82,11 @@ export async function updateItem(
   let updateExpression = "SET ";
   
   Object.entries(updates).forEach(([key, value], index) => {
+    // Skip null or undefined values
+    if (value === null || value === undefined) {
+      return;
+    }
+    
     const nameKey = `#attr${index}`;
     const valueKey = `:value${index}`;
     
@@ -82,6 +95,13 @@ export async function updateItem(
     
     updateExpression += `${nameKey} = ${valueKey}${index < Object.keys(updates).length - 1 ? ", " : ""}`;
   });
+  
+  // If all values were null/undefined, return the existing item
+  if (Object.keys(expressionAttributeValues).length === 0) {
+    console.log("All update values were null/undefined for item:", id);
+    const existingItem = await getItem(tableName, id);
+    return existingItem;
+  }
 
   const params = {
     TableName: tableName,
@@ -107,7 +127,9 @@ export async function deleteItem(tableName: string, id: number): Promise<boolean
   return true;
 }
 
-// Helper function to generate a unique ID
+// Helper function to generate a unique ID within PostgreSQL integer range
 export function generateId(): number {
-  return Date.now();
+  // Generate a random number between 1 and 2147483647 (max PostgreSQL integer)
+  // This avoids using timestamps which can exceed the max integer value
+  return Math.floor(Math.random() * 2147483647) + 1;
 }

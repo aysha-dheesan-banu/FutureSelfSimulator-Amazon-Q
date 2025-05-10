@@ -1,7 +1,8 @@
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
+import { registerRoutes } from "./routes/index";
 import { setupVite, serveStatic, log } from "./vite";
-import { setupTables } from "./db/setup";
+// Import config to ensure environment variables are loaded
+import { config } from "./config";
 
 const app = express();
 app.use(express.json());
@@ -39,10 +40,11 @@ app.use((req, res, next) => {
 
 (async () => {
   try {
-    // Setup DynamoDB tables before anything else
-    log("Setting up DynamoDB tables...");
-    await setupTables();
-    log("DynamoDB tables setup complete");
+    // Setup data storage
+    log("Initializing data storage...");
+    const { seedData } = await import("./storage");
+    await seedData();
+    log("Data storage initialized");
     
     const server = await registerRoutes(app);
 
@@ -63,17 +65,66 @@ app.use((req, res, next) => {
       serveStatic(app);
     }
 
-    // ALWAYS serve the app on port 5000
+    // Try to serve the app on configured port or fallback to other ports
     // this serves both the API and the client.
-    // It is the only port that is not firewalled.
-    const port = 5000;
-    server.listen({
-      port,
-      host: "0.0.0.0",
-      reusePort: true,
-    }, () => {
-      log(`serving on port ${port}`);
-    });
+    const configuredPort = config.port;
+    const ports = [configuredPort, 5000, 3000, 8080, 8000, 9000, 4000];
+    let serverStarted = false;
+    
+    // Try each port in sequence
+    for (const port of ports) {
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const serverInstance = server.listen(port, () => {
+            log(`Server running at http://localhost:${port}`);
+            serverStarted = true;
+            resolve();
+          });
+          
+          serverInstance.on('error', (err: any) => {
+            if (err.code === 'EADDRINUSE') {
+              log(`Port ${port} is already in use, trying next port...`);
+            } else {
+              log(`Error on port ${port}: ${err.message}`);
+            }
+            reject(err);
+          });
+        });
+        
+        // If we get here, the server started successfully
+        if (serverStarted) break;
+      } catch (err) {
+        // Continue to the next port if this one failed
+        continue;
+      }
+    }
+    
+    if (!serverStarted) {
+      // Try a random port as last resort
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const serverInstance = server.listen(0, () => {
+            const address = serverInstance.address();
+            const port = typeof address === 'object' && address ? address.port : 0;
+            log(`Server running on random port: http://localhost:${port}`);
+            serverStarted = true;
+            resolve();
+          });
+          
+          serverInstance.on('error', (err) => {
+            log(`Error starting server on random port: ${err.message}`);
+            reject(err);
+          });
+        });
+      } catch (err) {
+        log("Failed to start server even on random port");
+        throw new Error("Could not start server on any port");
+      }
+      
+      if (!serverStarted) {
+        throw new Error("Could not start server on any of the configured ports");
+      }
+    }
   } catch (error: any) {
     log(`Error starting server: ${error?.message || 'Unknown error'}`);
     console.error(error);

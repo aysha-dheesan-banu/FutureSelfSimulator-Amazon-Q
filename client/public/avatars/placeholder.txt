@@ -1,0 +1,18 @@
+This directory contains avatar images for the application.
+
+Female avatars:
+- "D:\images\female 1.png"
+- "D:\images\female 2.png"
+- "D:\images\female 3.png"
+- "D:\images\female 4.png"
+- "D:\images\female 5.png"
+- "D:\images\female 6.png"
+
+Male avatars:
+- "D:\images\male 1.png"
+- "D:\images\male  2 .png"
+- "D:\images\male 3.png"
+- "D:\images\male 4.png"
+- "D:\images\male 5.png"
+- "D:\images\male 6.png"
+These should be modern, professional avatar images suitable for a personal development application.

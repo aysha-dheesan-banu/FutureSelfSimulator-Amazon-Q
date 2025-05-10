@@ -1,43 +1,70 @@
 import { Route, Switch } from "wouter";
-import Login from "@/pages/login";
-import Dashboard from "@/pages/dashboard";
-import FutureSelf from "@/pages/future-self";
-import Goals from "@/pages/goals";
-import Journal from "@/pages/journal";
-import AiCoach from "@/pages/ai-coach";
-import NotFound from "@/pages/not-found";
-import { Suspense } from "react";
-import { AuthProvider } from "@/hooks/use-auth";
 import { Toaster } from "@/components/ui/toaster";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
+import LoginPage from "@/pages/login";
+import RegisterPage from "@/pages/register";
+import Dashboard from "@/pages/dashboard";
+import ProfilePage from "@/pages/profile";
+import FuturePredictPage from "@/pages/future-predict";
+import GoalsPage from "@/pages/goals";
+import HabitsPage from "@/pages/habits";
+import JournalPage from "@/pages/journal";
+import ProtectedRoute from "@/components/auth/protected-route";
+import { AuthProvider } from "@/hooks/use-auth";
+import AppLayout from "@/components/layout/app-layout";
 
-// Create a loading component
-const LoadingScreen = () => (
-  <div className="flex items-center justify-center min-h-screen">
-    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-  </div>
-);
-
-function App() {
+export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <Suspense fallback={<LoadingScreen />}>
-          <Switch>
-            <Route path="/" component={Login} />
-            <Route path="/dashboard" component={Dashboard} />
-            <Route path="/future-self" component={FutureSelf} />
-            <Route path="/goals" component={Goals} />
-            <Route path="/journal" component={Journal} />
-            <Route path="/ai-coach" component={AiCoach} />
-            <Route component={NotFound} />
-          </Switch>
-        </Suspense>
-        <Toaster />
-      </AuthProvider>
-    </QueryClientProvider>
+    <AuthProvider>
+      <Switch>
+        <Route path="/login" component={LoginPage} />
+        <Route path="/register" component={RegisterPage} />
+        <Route path="/dashboard">
+          <ProtectedRoute>
+            <AppLayout>
+              <Dashboard />
+            </AppLayout>
+          </ProtectedRoute>
+        </Route>
+        <Route path="/profile">
+          <ProtectedRoute>
+            <AppLayout>
+              <ProfilePage />
+            </AppLayout>
+          </ProtectedRoute>
+        </Route>
+        <Route path="/future-predict">
+          <ProtectedRoute>
+            <AppLayout>
+              <FuturePredictPage />
+            </AppLayout>
+          </ProtectedRoute>
+        </Route>
+        <Route path="/goals">
+          <ProtectedRoute>
+            <AppLayout>
+              <GoalsPage />
+            </AppLayout>
+          </ProtectedRoute>
+        </Route>
+        <Route path="/habits">
+          <ProtectedRoute>
+            <AppLayout>
+              <HabitsPage />
+            </AppLayout>
+          </ProtectedRoute>
+        </Route>
+        <Route path="/journal">
+          <ProtectedRoute>
+            <AppLayout>
+              <JournalPage />
+            </AppLayout>
+          </ProtectedRoute>
+        </Route>
+        <Route path="/">
+          <LoginPage />
+        </Route>
+      </Switch>
+      <Toaster />
+    </AuthProvider>
   );
 }
-
-export default App;

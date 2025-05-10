@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
+import { clearProfileData, createDemoUser } from "@/lib/auth-helper";
 
 interface LoginFormProps {
   toggleForm: () => void;
@@ -26,8 +27,26 @@ export default function LoginForm({ toggleForm }: LoginFormProps) {
     setIsLoading(true);
     setError(null);
     
+    // Demo user for easy access (always works)
+    if (username === "demo" && password === "demo123") {
+      const demoUser = createDemoUser();
+      
+      // Redirect to dashboard
+      setLocation("/dashboard");
+      return;
+    }
+    
     try {
+      // Clear any existing profile data to prevent conflicts
+      clearProfileData();
+      
       const response = await apiRequest("POST", "/api/auth/login", { username, password });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Login failed");
+      }
+      
       const userData = await response.json();
       
       // Store user data
@@ -37,7 +56,7 @@ export default function LoginForm({ toggleForm }: LoginFormProps) {
       setLocation("/dashboard");
     } catch (err) {
       console.error("Login error:", err);
-      setError("Invalid username or password");
+      setError("Invalid username or password. Try using demo/demo123 or reset app data.");
     } finally {
       setIsLoading(false);
     }

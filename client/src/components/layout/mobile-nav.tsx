@@ -5,7 +5,8 @@ import {
   Rocket, 
   Target, 
   BookOpen, 
-  MessageSquare 
+  MessageSquare,
+  Settings 
 } from "lucide-react";
 
 export default function MobileNav() {
@@ -42,6 +43,12 @@ export default function MobileNav() {
       icon: MessageSquare,
       active: location === "/ai-coach",
     },
+    {
+          name: "Settings",
+          href: "/settings",
+          icon: Settings,
+          active: location === "/settings",
+        },
   ];
   
   return (

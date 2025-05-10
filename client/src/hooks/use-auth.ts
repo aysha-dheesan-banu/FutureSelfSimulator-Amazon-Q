@@ -33,14 +33,39 @@ export function useProvideAuth(): AuthContextType {
     const storedUser = localStorage.getItem("futureUser");
     if (storedUser) {
       try {
-        setUser(JSON.parse(storedUser));
+        const parsedUser = JSON.parse(storedUser);
+        console.log("Loaded user from storage:", parsedUser);
+        setUser(parsedUser);
       } catch (e) {
         console.error("Error parsing stored user", e);
         localStorage.removeItem("futureUser");
+        // Use demo user as fallback
+        setDemoUser();
       }
+    } else {
+      // Auto-login with demo user for testing
+      setDemoUser();
     }
     setIsLoading(false);
   }, []);
+  
+  // Helper function to set demo user
+  const setDemoUser = () => {
+    const demoUser = {
+      id: 85406393,
+      username: "demouser",
+      email: "demo@example.com",
+      name: "John Smith",
+      level: 1,
+      points: 0,
+      avatarUrl: "https://images.unsplash.com/photo-1633332755192-727a05c4013d?ixlib=rb-4.0.3&auto=format&fit=crop&w=120&h=120",
+      traits: {},
+      preferences: {}
+    };
+    console.log("Setting demo user:", demoUser);
+    setUser(demoUser);
+    localStorage.setItem("futureUser", JSON.stringify(demoUser));
+  };
 
   const login = async (username: string, password: string) => {
     setIsLoading(true);

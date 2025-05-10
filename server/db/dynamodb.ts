@@ -1,39 +1,39 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+import { config } from "../config";
 
-// Check if we have AWS credentials
-if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY || !process.env.AWS_REGION) {
-  console.error("AWS credentials missing. Please set AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_REGION.");
+// Warn if AWS credentials are missing
+if (!config.aws.accessKeyId || !config.aws.secretAccessKey || !config.aws.region) {
+  console.error("AWS credentials missing. Please set AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_REGION in .env file.");
 }
 
-// Create a DynamoDB client
+// Create DynamoDB client
 const client = new DynamoDBClient({
-  region: process.env.AWS_REGION,
+  region: config.aws.region,
   credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || "",
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "",
+    accessKeyId: config.aws.accessKeyId || "",
+    secretAccessKey: config.aws.secretAccessKey || "",
   },
-  // For demo purposes - avoid throttling on free tier
-  maxAttempts: 5
+  endpoint: config.aws.dynamodbEndpoint, // Use local DynamoDB endpoint if specified
+  // For local DynamoDB, we need to disable signature verification
+  ...(config.aws.dynamodbEndpoint ? {
+    tls: false
+  } : {})
 });
 
-// Create a document client (makes it easier to work with DynamoDB items)
+// Create a DocumentClient wrapper for easier data interaction
 export const ddbDocClient = DynamoDBDocumentClient.from(client, {
   marshallOptions: {
-    // Explicitly convert empty strings, blobs, and sets to null
     convertEmptyValues: true,
-    // Remove undefined values
     removeUndefinedValues: true,
-    // Convert typeof object to map attribute
     convertClassInstanceToMap: true,
   },
   unmarshallOptions: {
-    // Return numbers as JavaScript numbers instead of strings
     wrapNumbers: false,
   },
 });
 
-// Table names
+// Table names with prefix (configured in ../config)
 export const TABLES = {
   USERS: "future_self_users",
   FUTURE_PROFILES: "future_self_profiles",

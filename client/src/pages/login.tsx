@@ -1,37 +1,108 @@
 import { useState } from "react";
-import LoginForm from "@/components/auth/login-form";
-import SignupForm from "@/components/auth/signup-form";
+import { Link, useLocation } from "wouter";
+import { useAuth } from "@/hooks/use-auth";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
 
-// Removed useAuth import and usage to prevent circular dependency
-export default function Login() {
-  const [isLogin, setIsLogin] = useState(true);
-  
-  const toggleForm = () => {
-    setIsLogin(!isLogin);
+export default function LoginPage() {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const { login, isLoading, error } = useAuth();
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      await login(username, password);
+      toast({
+        title: "Login successful",
+        description: "Welcome back!",
+      });
+      setLocation("/dashboard");
+    } catch (err) {
+      toast({
+        title: "Login failed",
+        description: error || "Please check your credentials and try again.",
+        variant: "destructive",
+      });
+    }
   };
-  
+
   return (
-    <div className="fixed inset-0 z-50 bg-white flex flex-col items-center justify-center px-4">
-      <div className="max-w-md w-full space-y-8">
-        {/* Logo and App Title */}
-        <div className="text-center">
-          <h1 className="text-4xl font-bold text-primary mb-2">Future Self</h1>
-          <p className="text-gray-600">Visualize your potential, design your future</p>
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
+      <div className="w-full max-w-md space-y-8">
+        <div>
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+            Sign in to your account
+          </h2>
+          <p className="mt-2 text-center text-sm text-gray-600">
+            Or{" "}
+            <Link href="/register">
+              <a className="font-medium text-blue-600 hover:text-blue-500">
+                create a new account
+              </a>
+            </Link>
+          </p>
         </div>
-        
-        {/* Hero Image */}
-        <img 
-          src="https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&h=400" 
-          alt="Person looking at mountain sunrise" 
-          className="rounded-xl shadow-lg w-full h-auto my-6" 
-        />
-        
-        {/* Auth Form */}
-        {isLogin ? (
-          <LoginForm toggleForm={toggleForm} />
-        ) : (
-          <SignupForm toggleForm={toggleForm} />
-        )}
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          <div className="space-y-4 rounded-md shadow-sm">
+            <div>
+              <label htmlFor="username" className="sr-only">
+                Username
+              </label>
+              <Input
+                id="username"
+                name="username"
+                type="text"
+                autoComplete="username"
+                required
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Username"
+              />
+            </div>
+            <div>
+              <label htmlFor="password" className="sr-only">
+                Password
+              </label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Password"
+              />
+            </div>
+          </div>
+
+          {error && (
+            <div className="text-sm text-red-600">
+              {error}
+            </div>
+          )}
+
+          <div>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={isLoading}
+            >
+              {isLoading ? "Signing in..." : "Sign in"}
+            </Button>
+          </div>
+          
+          <div className="text-center text-sm text-gray-600">
+            <p>Demo account:</p>
+            <p>Username: demo</p>
+            <p>Password: password123</p>
+          </div>
+        </form>
       </div>
     </div>
   );

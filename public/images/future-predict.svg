@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="300" viewBox="0 0 600 300">
+  <defs>
+    <linearGradient id="card-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4F46E5" />
+      <stop offset="100%" stop-color="#8B5CF6" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="600" height="300" rx="8" fill="url(#card-gradient)" />
+  
+  <!-- Content -->
+  <text x="30" y="40" font-family="Arial" font-size="24" font-weight="bold" fill="white">FuturePredict</text>
+  <text x="30" y="70" font-family="Arial" font-size="14" fill="white" opacity="0.8">Analyze your data to predict your future trajectory</text>
+  
+  <!-- Categories -->
+  <rect x="30" y="100" width="150" height="60" rx="8" fill="white" opacity="0.1" />
+  <text x="45" y="125" font-family="Arial" font-size="14" font-weight="bold" fill="white">Career</text>
+  <rect x="45" y="135" width="120" height="6" rx="3" fill="white" opacity="0.2" />
+  <rect x="45" y="135" width="90" height="6" rx="3" fill="#FCD34D" />
+  
+  <rect x="190" y="100" width="150" height="60" rx="8" fill="white" opacity="0.1" />
+  <text x="205" y="125" font-family="Arial" font-size="14" font-weight="bold" fill="white">Health</text>
+  <rect x="205" y="135" width="120" height="6" rx="3" fill="white" opacity="0.2" />
+  <rect x="205" y="135" width="60" height="6" rx="3" fill="#FCD34D" />
+  
+  <rect x="350" y="100" width="150" height="60" rx="8" fill="white" opacity="0.1" />
+  <text x="365" y="125" font-family="Arial" font-size="14" font-weight="bold" fill="white">Relationships</text>
+  <rect x="365" y="135" width="120" height="6" rx="3" fill="white" opacity="0.2" />
+  <rect x="365" y="135" width="100" height="6" rx="3" fill="#FCD34D" />
+  
+  <!-- Insights -->
+  <rect x="30" y="180" width="260" height="100" rx="8" fill="white" opacity="0.1" />
+  <text x="45" y="205" font-family="Arial" font-size="14" font-weight="bold" fill="white">Key Insights</text>
+  <circle cx="45" cy="225" r="3" fill="#FCD34D" />
+  <text x="55" y="230" font-family="Arial" font-size="12" fill="white" opacity="0.8">Consistent habit tracking is creating growth</text>
+  <circle cx="45" cy="245" r="3" fill="#FCD34D" />
+  <text x="55" y="250" font-family="Arial" font-size="12" fill="white" opacity="0.8">Journal sentiment shows improving wellbeing</text>
+  <circle cx="45" cy="265" r="3" fill="#FCD34D" />
+  <text x="55" y="270" font-family="Arial" font-size="12" fill="white" opacity="0.8">Goal completion rates are highest in personal growth</text>
+  
+  <!-- Recommendations -->
+  <rect x="310" y="180" width="260" height="100" rx="8" fill="white" opacity="0.1" />
+  <text x="325" y="205" font-family="Arial" font-size="14" font-weight="bold" fill="white">Recommendations</text>
+  <circle cx="325" cy="225" r="3" fill="#10B981" />
+  <text x="335" y="230" font-family="Arial" font-size="12" fill="white" opacity="0.8">Increase consistency in health habits</text>
+  <circle cx="325" cy="245" r="3" fill="#10B981" />
+  <text x="335" y="250" font-family="Arial" font-size="12" fill="white" opacity="0.8">Set more specific financial milestones</text>
+  <circle cx="325" cy="265" r="3" fill="#10B981" />
+  <text x="335" y="270" font-family="Arial" font-size="12" fill="white" opacity="0.8">Continue your focus on relationship building</text>
+  
+  <!-- Button -->
+  <rect x="30" y="240" width="140" height="36" rx="18" fill="white" />
+  <text x="55" y="264" font-family="Arial" font-size="14" font-weight="bold" fill="#4F46E5">Predict My Future</text>
+</svg>

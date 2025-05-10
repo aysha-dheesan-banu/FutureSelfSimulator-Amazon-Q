@@ -1,372 +1,609 @@
-import { IStorage } from '../storage';
-import { TABLES } from './dynamodb';
-import { 
-  putItem, 
-  getItem, 
-  queryItems, 
-  scanItems, 
-  updateItem, 
-  deleteItem, 
-  generateId 
-} from './operations';
-import { setupTables } from './setup';
+import { ddbDocClient, TABLES } from "./dynamodb";
+import { PutCommand, GetCommand, QueryCommand, UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 
-import {
-  User, InsertUser,
-  FutureProfile, InsertFutureProfile,
-  Goal, InsertGoal,
-  Habit, InsertHabit,
-  Journal, InsertJournal,
-  Conversation, InsertConversation,
-  Message
-} from '@shared/schema';
-
-export class DynamoDBStorage implements IStorage {
-  constructor() {
-    // Initialize DynamoDB tables
-    this.initTables();
-  }
-
-  private async initTables() {
+/**
+ * DynamoDB storage implementation
+ */
+export class DynamoDBStorage {
+  /**
+   * Initialize DynamoDB tables
+   */
+  async initTables(): Promise<void> {
     try {
-      await setupTables();
-      console.log('DynamoDB tables initialized successfully');
-      
-      // Create a demo user if it doesn't exist
-      this.createDemoUserIfNotExists();
+      // We're not creating tables here - that's handled by setup.ts
+      // This is just a placeholder for any initialization logic
+      console.log("DynamoDB tables initialized successfully");
     } catch (error) {
-      console.error('Error initializing DynamoDB tables:', error);
+      console.error("Error initializing DynamoDB tables:", error);
+      throw error;
     }
   }
-  
-  private async createDemoUserIfNotExists() {
+
+  /**
+   * Create a demo user if it doesn't exist
+   */
+  async createDemoUserIfNotExists(): Promise<void> {
     try {
-      const demoUser = await this.getUserByUsername("demouser");
+      // Check if demo user exists
+      const demoUser = await this.getUserByUsername("demo");
       
       if (!demoUser) {
         console.log("Creating demo user...");
-        const user = await this.createUser({
-          username: "demouser",
-          password: "password123",
-          email: "demo@example.com", 
-          name: "John Smith",
-          avatarUrl: "https://images.unsplash.com/photo-1633332755192-727a05c4013d?ixlib=rb-4.0.3&auto=format&fit=crop&w=120&h=120"
+        await this.createUser({
+          username: "demo",
+          password: "password123", // In a real app, this would be hashed
+          email: "demo@example.com",
+          name: "Demo User",
+          avatarUrl: "/avatars/female-1.png",
+          level: 1,
+          points: 0,
+          traits: { openness: 0.8, conscientiousness: 0.7, extraversion: 0.6 },
+          preferences: { gender: "female", theme: "light" }
         });
-        
-        console.log("Created demo user with ID:", user.id);
-        this.seedDemoData(user.id);
+        console.log("Demo user created successfully");
+      } else {
+        console.log("Demo user already exists");
       }
     } catch (error) {
       console.error("Error creating demo user:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get the next ID for a table
+   */
+  private async getNextId(tableName: string): Promise<number> {
+    // In a real app, you'd use a counter table or UUID
+    // This is a simple implementation for demo purposes
+    try {
+      const result = await ddbDocClient.send(
+        new QueryCommand({
+          TableName: tableName,
+          Limit: 1,
+          ScanIndexForward: false,
+          KeyConditionExpression: "id > :minId",
+          ExpressionAttributeValues: {
+            ":minId": 0
+          }
+        })
+      );
+      
+      const items = result.Items || [];
+      return items.length > 0 ? (items[0].id as number) + 1 : 1;
+    } catch (error) {
+      console.error(`Error getting next ID for ${tableName}:`, error);
+      return 1; // Default to 1 if there's an error
+    }
+  }
+
+  // User operations
+  async getUserById(id: number) {
+    try {
+      const result = await ddbDocClient.send(
+        new GetCommand({
+          TableName: TABLES.USERS,
+          Key: { id }
+        })
+      );
+      
+      return result.Item;
+    } catch (error) {
+      console.error(`Error getting user ${id}:`, error);
+      throw error;
     }
   }
   
-  private async seedDemoData(userId: number) {
+  async getUserByUsername(username: string) {
     try {
-      // Create a future profile
-      await this.createFutureProfile({
-        userId,
-        avatarUrl: "https://images.unsplash.com/photo-1633332755192-727a05c4013d?ixlib=rb-4.0.3&auto=format&fit=crop&w=120&h=120",
-        career: "Senior Developer",
-        education: "Master's Degree",
-        health: "Good health, regular fitness",
-        wealth: "$95,000 annual income",
-        relationships: "Married with supportive partner",
-        location: "Tech hub city",
-        personalGrowth: "Regular learning and development"
-      });
-      
-      // Create demo goals
-      await this.createGoal({
-        userId,
-        title: "Learn Machine Learning",
-        description: "Complete a ML certification and build a project",
-        category: "Career",
-        dueDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000), // 3 months from now
-        progress: 45,
-        completed: false
-      });
-      
-      await this.createGoal({
-        userId,
-        title: "Run 5K",
-        description: "Train for and complete a 5K run",
-        category: "Health",
-        dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 2 weeks from now
-        progress: 80,
-        completed: false
-      });
-      
-      // Create demo habits
-      await this.createHabit({
-        userId,
-        title: "Morning Exercise",
-        streakCount: 12,
-        lastCompleted: new Date(Date.now() - 24 * 60 * 60 * 1000), // Yesterday
-        weekLog: [true, true, true, true, true, true, false]
-      });
-      
-      // Create demo journal entries
-      await this.createJournal({
-        userId,
-        content: "Had a productive day working on my machine learning project. Feeling optimistic about my progress.",
-        date: new Date(Date.now() - 24 * 60 * 60 * 1000), // Yesterday
-        sentiment: { rating: 4, confidence: 0.8 }
-      });
-      
-      // Create demo conversation
-      await this.createConversation({
-        userId,
-        messages: [
-          {
-            role: "assistant",
-            content: "Welcome back! How are you feeling about your progress on your \"Learn Machine Learning\" goal?",
-            timestamp: new Date(Date.now() - 60 * 60 * 1000).toISOString() // 1 hour ago
-          },
-          {
-            role: "user",
-            content: "I'm struggling to find time to practice coding.",
-            timestamp: new Date(Date.now() - 30 * 60 * 1000).toISOString() // 30 minutes ago
+      const result = await ddbDocClient.send(
+        new QueryCommand({
+          TableName: TABLES.USERS,
+          IndexName: "UsernameIndex",
+          KeyConditionExpression: "username = :username",
+          ExpressionAttributeValues: {
+            ":username": username
           }
-        ],
-        lastUpdated: new Date()
-      });
+        })
+      );
       
-      console.log("Demo data seeded successfully");
+      const items = result.Items || [];
+      return items.length > 0 ? items[0] : null;
     } catch (error) {
-      console.error("Error seeding demo data:", error);
+      console.error(`Error getting user by username ${username}:`, error);
+      throw error;
     }
   }
-
-  // User methods
-  async getUser(id: number): Promise<User | undefined> {
-    const user = await getItem(TABLES.USERS, id);
-    return user as User | undefined;
-  }
-
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    const users = await queryItems(TABLES.USERS, 'username', username);
-    return users.length > 0 ? users[0] as User : undefined;
-  }
-
-  async getUserByEmail(email: string): Promise<User | undefined> {
-    const users = await queryItems(TABLES.USERS, 'email', email);
-    return users.length > 0 ? users[0] as User : undefined;
-  }
-
-  async createUser(user: InsertUser): Promise<User> {
-    const id = generateId();
-    const newUser = { 
-      ...user, 
-      id, 
-      level: 1, 
-      points: 0,
-      traits: {},
-      preferences: {}
-    };
-    await putItem(TABLES.USERS, newUser);
-    return newUser as User;
-  }
-
-  async updateUserPoints(userId: number, points: number): Promise<User | undefined> {
-    const updatedUser = await updateItem(TABLES.USERS, userId, { points });
-    return updatedUser as User | undefined;
-  }
-
-  async updateUserLevel(userId: number, level: number): Promise<User | undefined> {
-    const updatedUser = await updateItem(TABLES.USERS, userId, { level });
-    return updatedUser as User | undefined;
-  }
-
-  async updateUserTraits(userId: number, traits: Record<string, any>): Promise<User | undefined> {
-    const updatedUser = await updateItem(TABLES.USERS, userId, { traits });
-    return updatedUser as User | undefined;
-  }
-
-  // Future profile methods
-  async getFutureProfile(userId: number): Promise<FutureProfile | undefined> {
-    const profiles = await queryItems(TABLES.FUTURE_PROFILES, 'userId', userId);
-    return profiles.length > 0 ? profiles[0] as FutureProfile : undefined;
-  }
-
-  async createFutureProfile(profile: InsertFutureProfile): Promise<FutureProfile> {
-    const id = generateId();
-    const newProfile = { ...profile, id };
-    await putItem(TABLES.FUTURE_PROFILES, newProfile);
-    return newProfile as FutureProfile;
-  }
-
-  async updateFutureProfile(id: number, profile: Partial<InsertFutureProfile>): Promise<FutureProfile | undefined> {
-    const updatedProfile = await updateItem(TABLES.FUTURE_PROFILES, id, profile);
-    return updatedProfile as FutureProfile | undefined;
-  }
-
-  // Goals methods
-  async getGoal(id: number): Promise<Goal | undefined> {
-    const goal = await getItem(TABLES.GOALS, id);
-    return goal as Goal | undefined;
-  }
-
-  async getGoalsByUser(userId: number): Promise<Goal[]> {
-    const goals = await queryItems(TABLES.GOALS, 'userId', userId);
-    return goals as Goal[] || [];
-  }
-
-  async createGoal(goal: InsertGoal): Promise<Goal> {
-    const id = generateId();
-    const newGoal = { 
-      ...goal, 
-      id, 
-      progress: goal.progress || 0,
-      completed: goal.completed || false
-    };
-    await putItem(TABLES.GOALS, newGoal);
-    return newGoal as Goal;
-  }
-
-  async updateGoal(id: number, goal: Partial<InsertGoal>): Promise<Goal | undefined> {
-    const updatedGoal = await updateItem(TABLES.GOALS, id, goal);
-    return updatedGoal as Goal | undefined;
-  }
-
-  async deleteGoal(id: number): Promise<boolean> {
-    return await deleteItem(TABLES.GOALS, id);
-  }
-
-  // Habits methods
-  async getHabit(id: number): Promise<Habit | undefined> {
-    const habit = await getItem(TABLES.HABITS, id);
-    return habit as Habit | undefined;
-  }
-
-  async getHabitsByUser(userId: number): Promise<Habit[]> {
-    const habits = await queryItems(TABLES.HABITS, 'userId', userId);
-    return habits as Habit[];
-  }
-
-  async createHabit(habit: InsertHabit): Promise<Habit> {
-    const id = generateId();
-    const newHabit = { 
-      ...habit, 
-      id, 
-      streakCount: habit.streakCount || 0,
-      weekLog: habit.weekLog || [false, false, false, false, false, false, false]
-    };
-    await putItem(TABLES.HABITS, newHabit);
-    return newHabit as Habit;
-  }
-
-  async updateHabit(id: number, habit: Partial<InsertHabit>): Promise<Habit | undefined> {
-    const updatedHabit = await updateItem(TABLES.HABITS, id, habit);
-    return updatedHabit as Habit | undefined;
-  }
-
-  async completeHabit(id: number, completed: boolean): Promise<Habit | undefined> {
-    const habit = await this.getHabit(id);
-    if (!habit) return undefined;
-
-    // Create a default weekLog if it doesn't exist
-    const defaultWeekLog = [false, false, false, false, false, false, false];
-    const weekLog = Array.isArray(habit.weekLog) 
-      ? [...habit.weekLog] 
-      : [...defaultWeekLog];
-    
-    if (completed) {
-      // Update today's entry in the week log
-      const today = new Date().getDay(); // 0 = Sunday, 1 = Monday, etc.
-      weekLog[today] = true;
+  
+  async createUser(userData: any) {
+    try {
+      const id = await this.getNextId(TABLES.USERS);
+      const user = { id, ...userData };
+      
+      await ddbDocClient.send(
+        new PutCommand({
+          TableName: TABLES.USERS,
+          Item: user
+        })
+      );
+      
+      return user;
+    } catch (error) {
+      console.error("Error creating user:", error);
+      throw error;
     }
-
-    // Make sure lastCompleted is a proper Date object when storing in DynamoDB
-    const lastCompletedDate = completed ? new Date() : 
-      (habit.lastCompleted ? new Date(habit.lastCompleted) : null);
-    
-    const updates = {
-      lastCompleted: lastCompletedDate,
-      weekLog,
-      streakCount: completed ? (habit.streakCount || 0) + 1 : habit.streakCount
-    };
-
-    return await this.updateHabit(id, updates as Partial<InsertHabit>);
   }
-
-  async deleteHabit(id: number): Promise<boolean> {
-    return await deleteItem(TABLES.HABITS, id);
-  }
-
-  // Journal methods
-  async getJournal(id: number): Promise<Journal | undefined> {
-    const journal = await getItem(TABLES.JOURNALS, id);
-    return journal as Journal | undefined;
-  }
-
-  async getJournalsByUser(userId: number, limit?: number): Promise<Journal[]> {
-    let journals = await queryItems(TABLES.JOURNALS, 'userId', userId);
-    
-    // Sort by date descending
-    journals = journals.sort((a, b) => {
-      const dateA = new Date(a.date).getTime();
-      const dateB = new Date(b.date).getTime();
-      return dateB - dateA;
-    });
-
-    // Apply limit if specified
-    if (limit && limit > 0) {
-      journals = journals.slice(0, limit);
+  
+  async updateUser(id: number, userData: any) {
+    try {
+      // Build update expression
+      const updateExpressions = [];
+      const expressionAttributeNames: Record<string, string> = {};
+      const expressionAttributeValues: Record<string, any> = {};
+      
+      for (const [key, value] of Object.entries(userData)) {
+        if (key !== "id") { // Don't update the primary key
+          updateExpressions.push(`#${key} = :${key}`);
+          expressionAttributeNames[`#${key}`] = key;
+          expressionAttributeValues[`:${key}`] = value;
+        }
+      }
+      
+      if (updateExpressions.length === 0) {
+        return await this.getUserById(id); // Nothing to update
+      }
+      
+      const result = await ddbDocClient.send(
+        new UpdateCommand({
+          TableName: TABLES.USERS,
+          Key: { id },
+          UpdateExpression: `SET ${updateExpressions.join(", ")}`,
+          ExpressionAttributeNames: expressionAttributeNames,
+          ExpressionAttributeValues: expressionAttributeValues,
+          ReturnValues: "ALL_NEW"
+        })
+      );
+      
+      return result.Attributes;
+    } catch (error) {
+      console.error(`Error updating user ${id}:`, error);
+      throw error;
     }
-
-    return journals as Journal[];
   }
-
-  async createJournal(journal: InsertJournal): Promise<Journal> {
-    const id = generateId();
-    const newJournal = { ...journal, id };
-    await putItem(TABLES.JOURNALS, newJournal);
-    return newJournal as Journal;
+  
+  // Goal operations
+  async getGoalById(id: number) {
+    try {
+      const result = await ddbDocClient.send(
+        new GetCommand({
+          TableName: TABLES.GOALS,
+          Key: { id }
+        })
+      );
+      
+      return result.Item;
+    } catch (error) {
+      console.error(`Error getting goal ${id}:`, error);
+      throw error;
+    }
   }
-
-  async updateJournal(id: number, journal: Partial<InsertJournal>): Promise<Journal | undefined> {
-    const updatedJournal = await updateItem(TABLES.JOURNALS, id, journal);
-    return updatedJournal as Journal | undefined;
+  
+  async getGoalsByUserId(userId: number) {
+    try {
+      const result = await ddbDocClient.send(
+        new QueryCommand({
+          TableName: TABLES.GOALS,
+          IndexName: "UserIdIndex",
+          KeyConditionExpression: "userId = :userId",
+          ExpressionAttributeValues: {
+            ":userId": userId
+          }
+        })
+      );
+      
+      return result.Items || [];
+    } catch (error) {
+      console.error(`Error getting goals for user ${userId}:`, error);
+      throw error;
+    }
   }
-
-  async deleteJournal(id: number): Promise<boolean> {
-    return await deleteItem(TABLES.JOURNALS, id);
+  
+  async createGoal(goalData: any) {
+    try {
+      const id = await this.getNextId(TABLES.GOALS);
+      const goal = { id, ...goalData };
+      
+      await ddbDocClient.send(
+        new PutCommand({
+          TableName: TABLES.GOALS,
+          Item: goal
+        })
+      );
+      
+      return goal;
+    } catch (error) {
+      console.error("Error creating goal:", error);
+      throw error;
+    }
   }
-
-  // Conversation methods
-  async getConversation(id: number): Promise<Conversation | undefined> {
-    const conversation = await getItem(TABLES.CONVERSATIONS, id);
-    return conversation as Conversation | undefined;
+  
+  async updateGoal(id: number, goalData: any) {
+    try {
+      // Build update expression
+      const updateExpressions = [];
+      const expressionAttributeNames: Record<string, string> = {};
+      const expressionAttributeValues: Record<string, any> = {};
+      
+      for (const [key, value] of Object.entries(goalData)) {
+        if (key !== "id") { // Don't update the primary key
+          updateExpressions.push(`#${key} = :${key}`);
+          expressionAttributeNames[`#${key}`] = key;
+          expressionAttributeValues[`:${key}`] = value;
+        }
+      }
+      
+      if (updateExpressions.length === 0) {
+        return await this.getGoalById(id); // Nothing to update
+      }
+      
+      const result = await ddbDocClient.send(
+        new UpdateCommand({
+          TableName: TABLES.GOALS,
+          Key: { id },
+          UpdateExpression: `SET ${updateExpressions.join(", ")}`,
+          ExpressionAttributeNames: expressionAttributeNames,
+          ExpressionAttributeValues: expressionAttributeValues,
+          ReturnValues: "ALL_NEW"
+        })
+      );
+      
+      return result.Attributes;
+    } catch (error) {
+      console.error(`Error updating goal ${id}:`, error);
+      throw error;
+    }
   }
-
-  async getConversationByUser(userId: number): Promise<Conversation | undefined> {
-    const conversations = await queryItems(TABLES.CONVERSATIONS, 'userId', userId);
-    return conversations.length > 0 ? conversations[0] as Conversation : undefined;
+  
+  async deleteGoal(id: number) {
+    try {
+      await ddbDocClient.send(
+        new DeleteCommand({
+          TableName: TABLES.GOALS,
+          Key: { id }
+        })
+      );
+      
+      return true;
+    } catch (error) {
+      console.error(`Error deleting goal ${id}:`, error);
+      throw error;
+    }
   }
-
-  async createConversation(conversation: InsertConversation): Promise<Conversation> {
-    const id = generateId();
-    const newConversation = { ...conversation, id };
-    await putItem(TABLES.CONVERSATIONS, newConversation);
-    return newConversation as Conversation;
+  
+  // Habit operations
+  async getHabitById(id: number) {
+    try {
+      const result = await ddbDocClient.send(
+        new GetCommand({
+          TableName: TABLES.HABITS,
+          Key: { id }
+        })
+      );
+      
+      return result.Item;
+    } catch (error) {
+      console.error(`Error getting habit ${id}:`, error);
+      throw error;
+    }
   }
-
-  async updateConversation(id: number, message: Message): Promise<Conversation | undefined> {
-    const conversation = await this.getConversation(id);
-    if (!conversation) return undefined;
-
-    // Ensure messages is an array
-    const existingMessages = Array.isArray(conversation.messages) 
-      ? conversation.messages 
-      : [];
-    
-    const messages = [...existingMessages, message];
-    const lastUpdated = new Date().toISOString();
-
-    const updates = { messages, lastUpdated };
-    const updatedConversation = await updateItem(TABLES.CONVERSATIONS, id, updates);
-    
-    return updatedConversation as Conversation | undefined;
+  
+  async getHabitsByUserId(userId: number) {
+    try {
+      const result = await ddbDocClient.send(
+        new QueryCommand({
+          TableName: TABLES.HABITS,
+          IndexName: "UserIdIndex",
+          KeyConditionExpression: "userId = :userId",
+          ExpressionAttributeValues: {
+            ":userId": userId
+          }
+        })
+      );
+      
+      return result.Items || [];
+    } catch (error) {
+      console.error(`Error getting habits for user ${userId}:`, error);
+      throw error;
+    }
+  }
+  
+  async createHabit(habitData: any) {
+    try {
+      const id = await this.getNextId(TABLES.HABITS);
+      const habit = { id, ...habitData };
+      
+      await ddbDocClient.send(
+        new PutCommand({
+          TableName: TABLES.HABITS,
+          Item: habit
+        })
+      );
+      
+      return habit;
+    } catch (error) {
+      console.error("Error creating habit:", error);
+      throw error;
+    }
+  }
+  
+  async updateHabit(id: number, habitData: any) {
+    try {
+      // Build update expression
+      const updateExpressions = [];
+      const expressionAttributeNames: Record<string, string> = {};
+      const expressionAttributeValues: Record<string, any> = {};
+      
+      for (const [key, value] of Object.entries(habitData)) {
+        if (key !== "id") { // Don't update the primary key
+          updateExpressions.push(`#${key} = :${key}`);
+          expressionAttributeNames[`#${key}`] = key;
+          expressionAttributeValues[`:${key}`] = value;
+        }
+      }
+      
+      if (updateExpressions.length === 0) {
+        return await this.getHabitById(id); // Nothing to update
+      }
+      
+      const result = await ddbDocClient.send(
+        new UpdateCommand({
+          TableName: TABLES.HABITS,
+          Key: { id },
+          UpdateExpression: `SET ${updateExpressions.join(", ")}`,
+          ExpressionAttributeNames: expressionAttributeNames,
+          ExpressionAttributeValues: expressionAttributeValues,
+          ReturnValues: "ALL_NEW"
+        })
+      );
+      
+      return result.Attributes;
+    } catch (error) {
+      console.error(`Error updating habit ${id}:`, error);
+      throw error;
+    }
+  }
+  
+  async deleteHabit(id: number) {
+    try {
+      await ddbDocClient.send(
+        new DeleteCommand({
+          TableName: TABLES.HABITS,
+          Key: { id }
+        })
+      );
+      
+      return true;
+    } catch (error) {
+      console.error(`Error deleting habit ${id}:`, error);
+      throw error;
+    }
+  }
+  
+  // Journal operations
+  async getJournalById(id: number) {
+    try {
+      const result = await ddbDocClient.send(
+        new GetCommand({
+          TableName: TABLES.JOURNALS,
+          Key: { id }
+        })
+      );
+      
+      return result.Item;
+    } catch (error) {
+      console.error(`Error getting journal ${id}:`, error);
+      throw error;
+    }
+  }
+  
+  async getJournalsByUserId(userId: number) {
+    try {
+      const result = await ddbDocClient.send(
+        new QueryCommand({
+          TableName: TABLES.JOURNALS,
+          IndexName: "UserIdIndex",
+          KeyConditionExpression: "userId = :userId",
+          ExpressionAttributeValues: {
+            ":userId": userId
+          }
+        })
+      );
+      
+      return result.Items || [];
+    } catch (error) {
+      console.error(`Error getting journals for user ${userId}:`, error);
+      throw error;
+    }
+  }
+  
+  async createJournal(journalData: any) {
+    try {
+      const id = await this.getNextId(TABLES.JOURNALS);
+      const journal = { id, ...journalData };
+      
+      await ddbDocClient.send(
+        new PutCommand({
+          TableName: TABLES.JOURNALS,
+          Item: journal
+        })
+      );
+      
+      return journal;
+    } catch (error) {
+      console.error("Error creating journal:", error);
+      throw error;
+    }
+  }
+  
+  async updateJournal(id: number, journalData: any) {
+    try {
+      // Build update expression
+      const updateExpressions = [];
+      const expressionAttributeNames: Record<string, string> = {};
+      const expressionAttributeValues: Record<string, any> = {};
+      
+      for (const [key, value] of Object.entries(journalData)) {
+        if (key !== "id") { // Don't update the primary key
+          updateExpressions.push(`#${key} = :${key}`);
+          expressionAttributeNames[`#${key}`] = key;
+          expressionAttributeValues[`:${key}`] = value;
+        }
+      }
+      
+      if (updateExpressions.length === 0) {
+        return await this.getJournalById(id); // Nothing to update
+      }
+      
+      const result = await ddbDocClient.send(
+        new UpdateCommand({
+          TableName: TABLES.JOURNALS,
+          Key: { id },
+          UpdateExpression: `SET ${updateExpressions.join(", ")}`,
+          ExpressionAttributeNames: expressionAttributeNames,
+          ExpressionAttributeValues: expressionAttributeValues,
+          ReturnValues: "ALL_NEW"
+        })
+      );
+      
+      return result.Attributes;
+    } catch (error) {
+      console.error(`Error updating journal ${id}:`, error);
+      throw error;
+    }
+  }
+  
+  async deleteJournal(id: number) {
+    try {
+      await ddbDocClient.send(
+        new DeleteCommand({
+          TableName: TABLES.JOURNALS,
+          Key: { id }
+        })
+      );
+      
+      return true;
+    } catch (error) {
+      console.error(`Error deleting journal ${id}:`, error);
+      throw error;
+    }
+  }
+  
+  // Conversation operations
+  async getConversationById(id: number) {
+    try {
+      const result = await ddbDocClient.send(
+        new GetCommand({
+          TableName: TABLES.CONVERSATIONS,
+          Key: { id }
+        })
+      );
+      
+      return result.Item;
+    } catch (error) {
+      console.error(`Error getting conversation ${id}:`, error);
+      throw error;
+    }
+  }
+  
+  async getConversationsByUserId(userId: number) {
+    try {
+      const result = await ddbDocClient.send(
+        new QueryCommand({
+          TableName: TABLES.CONVERSATIONS,
+          IndexName: "UserIdIndex",
+          KeyConditionExpression: "userId = :userId",
+          ExpressionAttributeValues: {
+            ":userId": userId
+          }
+        })
+      );
+      
+      return result.Items || [];
+    } catch (error) {
+      console.error(`Error getting conversations for user ${userId}:`, error);
+      throw error;
+    }
+  }
+  
+  async createConversation(conversationData: any) {
+    try {
+      const id = await this.getNextId(TABLES.CONVERSATIONS);
+      const conversation = { id, ...conversationData };
+      
+      await ddbDocClient.send(
+        new PutCommand({
+          TableName: TABLES.CONVERSATIONS,
+          Item: conversation
+        })
+      );
+      
+      return conversation;
+    } catch (error) {
+      console.error("Error creating conversation:", error);
+      throw error;
+    }
+  }
+  
+  async updateConversation(id: number, conversationData: any) {
+    try {
+      // Build update expression
+      const updateExpressions = [];
+      const expressionAttributeNames: Record<string, string> = {};
+      const expressionAttributeValues: Record<string, any> = {};
+      
+      for (const [key, value] of Object.entries(conversationData)) {
+        if (key !== "id") { // Don't update the primary key
+          updateExpressions.push(`#${key} = :${key}`);
+          expressionAttributeNames[`#${key}`] = key;
+          expressionAttributeValues[`:${key}`] = value;
+        }
+      }
+      
+      if (updateExpressions.length === 0) {
+        return await this.getConversationById(id); // Nothing to update
+      }
+      
+      const result = await ddbDocClient.send(
+        new UpdateCommand({
+          TableName: TABLES.CONVERSATIONS,
+          Key: { id },
+          UpdateExpression: `SET ${updateExpressions.join(", ")}`,
+          ExpressionAttributeNames: expressionAttributeNames,
+          ExpressionAttributeValues: expressionAttributeValues,
+          ReturnValues: "ALL_NEW"
+        })
+      );
+      
+      return result.Attributes;
+    } catch (error) {
+      console.error(`Error updating conversation ${id}:`, error);
+      throw error;
+    }
+  }
+  
+  async deleteConversation(id: number) {
+    try {
+      await ddbDocClient.send(
+        new DeleteCommand({
+          TableName: TABLES.CONVERSATIONS,
+          Key: { id }
+        })
+      );
+      
+      return true;
+    } catch (error) {
+      console.error(`Error deleting conversation ${id}:`, error);
+      throw error;
+    }
   }
 }
